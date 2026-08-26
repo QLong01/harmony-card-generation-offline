@@ -1,1 +1,0 @@
-{"title":"电量概览","description":"剩余电量与等级","suggestSize":"2x2","dataBindings":[{"capabilityId":"GetPhoneBatteryInfo","arguments":{},"writeResultTo":"/data/phoneBattery"}]}
