@@ -31,16 +31,11 @@
 │   ├── capability/
 │   ├── design/
 │   └── protocol/
-├── versions/
-│   ├── d118b5f/                 # 初始提交的完整快照
-│   └── 0a9f8d2/                 # Design Compact 对齐提交的完整快照
 └── scripts/
     ├── validate_card.py
     ├── rules/
     └── validators/
 ```
-
-两个固定历史版本的说明见 [`versions/README.md`](versions/README.md)。仓库根目录保留为当前开发版本，版本快照不会随根目录后续修改自动变化。
 
 ## 使用方式
 

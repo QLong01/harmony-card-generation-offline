@@ -1,0 +1,4 @@
+interface:
+  display_name: "Harmony Form 卡片生成（Pixso 0804）"
+  short_description: "按 Pixso 0804 严格生成 2×2 HarmonyOS Form 卡片。"
+  default_prompt: "使用 $harmony-card-generation-offline 生成 HarmonyOS A2UI Form 服务卡片。先完整读取 Pixso 0804 规范，只生成规范覆盖的 2x2；严格使用其标题、内容、按钮、字号、间距、图表、背景和 icon 规则，不外推 2x4，不创建场景拓展色。协议、绑定、事件和 CardSpec 必须闭环，最后只输出 genui 和 cardspec 代码块。"

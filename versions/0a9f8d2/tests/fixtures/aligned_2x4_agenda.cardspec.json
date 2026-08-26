@@ -1,0 +1,1 @@
+{"title":"今日安排","description":"两项日程摘要","suggestSize":"2x4","dataBindings":[{"capabilityId":"GetCalendarEvents","arguments":{"futureDays":1},"writeResultTo":"/data/calendar"}]}

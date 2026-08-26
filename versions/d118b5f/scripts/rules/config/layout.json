@@ -1,0 +1,33 @@
+{
+  "visualAuthority": "reference/design/pixso-0804-spec.md",
+  "pixsoSource": "https://pixso.cn/app/design/sTEzUn-GOOGP6NK6fNI0hg?file_type=10&icon_type=1&page-id=0%3A1",
+  "visualGenerationSizes": ["2x2"],
+  "defaultPadding": 8,
+  "allowedFontSizes": [10, 12, 14, 16, 20, 30, 38],
+  "allowedSpacing": [0, 2, 4, 8, 12, 16],
+  "minClickableSize": 30,
+  "pillButtonHeight": 36,
+  "iconButtonSize": 30,
+  "iconButtonGlyphSize": 16,
+  "titleIconSize": 20,
+  "titleIconRadius": 4,
+  "titleTextMaxWidthWithIcon": 112,
+  "ringDefaultSize": 52,
+  "ringMinSize": 44,
+  "ringStrokeWidth": 6,
+  "ringCenterIconSize": 24,
+  "progressStrokeWidth1To2": 8,
+  "progressStrokeWidth3": 4,
+  "maxMeaninglessWhitespace": 16,
+  "maxGradientStops": 2,
+  "pixsoTruncatableTextOverflow": ["ellipsis"],
+  "criticalTextOverflowAllowed": [],
+  "qualityWeights": {
+    "protocol": 25,
+    "layout": 25,
+    "style": 15,
+    "color": 20,
+    "asset": 10,
+    "content": 5
+  }
+}
