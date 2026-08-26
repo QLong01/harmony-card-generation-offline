@@ -1,0 +1,8 @@
+{
+  "forbiddenPatterns": [
+    "^https?://",
+    "^data:image/",
+    "base64"
+  ],
+  "allowlistSource": "scripts/rules/capabilities/app-11.7.5.205_rom-6.0/asset_capabilities.json"
+}

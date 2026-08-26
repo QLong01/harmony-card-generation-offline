@@ -1,0 +1,16 @@
+{
+  "profileId": "app-11.7.5.205_rom-6.0",
+  "bundleDirectory": "scripts/rules/capabilities/app-11.7.5.205_rom-6.0",
+  "dataManifest": "data_capabilities.json",
+  "eventManifest": "event_capabilities.json",
+  "assetManifest": "asset_capabilities.json",
+  "sha256": {
+    "data_capabilities.json": "cc37a2b94801135661a95d4914ffca1fdb187ba6a07105c2e17dc8102e9835c9",
+    "event_capabilities.json": "b4ff916c3ea7bd2411f571b18148327627742b9e025b95ee6595ea29271d72c4",
+    "asset_capabilities.json": "98fea9f1ff7f130e7947d2d35bdd230b723701c23f81944750d3d51db928ac1d"
+  },
+  "sourceUrl": "https://github.com/linfachen-lff/CreateMyCard/tree/dev/widget_service/cloud/data/capabilities/app-11.7.5.205_rom-6.0",
+  "sourceCommit": "854956dc6364295ad0cfcb5f683b5f7b4d5bb494",
+  "devHeadAtSync": "854956dc6364295ad0cfcb5f683b5f7b4d5bb494",
+  "sourcePathPresentAtDevHead": true
+}
