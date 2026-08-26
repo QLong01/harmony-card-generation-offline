@@ -276,11 +276,11 @@ reporter = validate_card(
 
 | 阶段 | 触发条件 | 参与 validator |
 | --- | --- | --- |
-| `hard` | 协议/结构错误必须先修 | `ProtocolValidator`、`ComponentValidator`、`CardSpecValidator`、`ExpressionValidator`、`AssetValidator` |
+| `hard` | 协议/结构错误必须先修 | `ProtocolValidator`、`ComponentValidator`、`DesignContractValidator`、`CardSpecValidator`、`ExpressionValidator`、`AssetValidator` |
 | `semantic` | 结构 OK 后跑语义规则 | `BindingValidator`、`CrossValidator`、`EffectiveCapabilityValidator`（仅动态模式） |
 | `quality` | 语义 OK 后跑质量规则 | 默认空；仅在 `--enable-aesthetic` 打开时由 `QualityValidator` 承担 |
 
-颜色（对比度、Pixso 色值、2-stop 渐变结构）、Pixso 字号/间距/root padding/按钮/ring/进度几何与其它质量项由美学模块负责；关闭美学模块时 `quality` 阶段不产生任何诊断。
+root 外壳、固定骨架、一级 region/动作/背板上限、主轴预算和关键布局契约始终在 hard 阶段执行。颜色对比、受控色板、2-stop 渐变、字号/ring 与其它审美风险由可选美学模块负责；关闭美学模块时 `quality` 阶段不产生诊断。
 
 默认 `--stage all` 即三阶段全跑；`--stop-on-stage-error` 会在 hard 出错后跳过 semantic、任一阶段累计出 error 后跳过 quality，用于交互式修复减少回合。若 JSONL 出现 `DSL_JSON_PARSE_FAILED`（属于 hard 阶段的致命错），流水线会整体停在解析层不再往后走。
 
@@ -293,7 +293,7 @@ scripts/
   rules/
     config/
       protocol.json                 # 协议、组件、CardSpec、列表循环 children、事件 handler 结构规则
-      layout.json                   # 布局/字号/间距/美学阈值（当前仅美学模块读取）
+      layout.json                   # 固定骨架、布局、字号、间距、ring 与美学阈值
       style.json                    # createSurface 允许样式、组件样式字段与枚举
       asset.json                    # 资源路径禁止模式与 allowlist
       expression.json               # 表达式长度、括号深度、禁用变量/操作符/关键字、允许函数
@@ -315,6 +315,7 @@ scripts/
     base.py                         # BaseValidator + JSON Pointer / 表达式 / 数值工具函数
     protocol_validator.py           # hard 阶段
     component_validator.py          # hard 阶段
+    design_contract_validator.py    # hard 阶段：固定骨架与数值布局契约
     cardspec_validator.py           # hard 阶段
     expression_validator.py         # hard 阶段
     asset_validator.py              # hard 阶段
@@ -333,20 +334,22 @@ scripts/
 
 - 默认 `--stage all` 不再触发它，`validate_card` 不会因它产生 warning/error。
 - 加 `--enable-aesthetic` 才在 quality 阶段独立跑并输出 `AESTHETIC_*` 诊断。
-- `layout.json` 里的 `defaultPadding`/`allowedFontSizes`/`allowedSpacing`/`qualityWeights` 等阈值当前只被这个模块读取；美学模块还会尝试从 `layout.json` 读取 `contrast*` / `max*` 等键，若缺失回退到内置默认。静态色板 / 字号阈值与当前 2x2 布局规则对齐前，默认关闭以避免误报。
-- 美学模块整体位于 `validators/aesthetic/`：`engine.py` 是纯分析引擎，`validator.py` 只是流水线包装；核心流水线不会在 `--enable-aesthetic` 关闭时 import 到 engine 的内部符号。
+- `layout.json` 的固定骨架在 hard 阶段执行；padding、字号、间距、ring、质量阈值及 `style.json` 的受控色板/渐变 pair 还会在 `--enable-aesthetic` 时传入引擎。独立运行 `engine.py` 时使用同值的内置回退。当前规则同时覆盖 2x2 与 2x4。
+- 可靠应用/对象主题色可超出默认色板；单色和可证明为同族浅色双 stop 的渐变会标记为 `DESIGN_COMPACT_THEME_*_REVIEW` 信息项，由调用方确认来源。跨色族或不满足弱主题条件的渐变仍按不合规处理。
+- 美学模块整体位于 `validators/aesthetic/`：`engine.py` 提供纯分析函数，`validator.py` 包装可选 quality 检查；hard 阶段的 `DesignContractValidator` 复用其中不依赖渲染的固定骨架/布局函数。
 - 颜色相关规则（token 回溯、hex 白名单、渐变结构）现在完全由美学模块承担；核心流水线已移除独立的 `ColorValidator`，`rules/config/color.json` 也已删除。
 
 ## Validator 与 rules 对应表
 
-流水线里每个 validator 都通过 `RuleRegistry`（`rules/config/*.json` + `rules/schemas/*.json` + `reference/design/*.md` 若干条目）读取规则，validator 自身不硬编码具体阈值；下表列出实际的读取关系。
+流水线通过 `RuleRegistry` 读取 `rules/config/*.json` 与 `rules/schemas/*.json`；validator 实现确定结构算法，配置提供可变阈值和允许集合。下表列出实际读取关系。
 
 ### hard 阶段
 
 | Validator | 读取的规则来源 | 主要检查 |
 | --- | --- | --- |
 | `ProtocolValidator` | `protocol.json` → `version` / `messageOrder` / `messageRequiredFields` / `messageNonEmptyFields` / `catalogIds` / `structureFieldsNoExpression`；`style.json` → `createSurfaceAllowedStyles` | 三行 JSONL 顺序、`version` 固定、必填字段非空、`surfaceId` 三行一致、`catalogId` 合法、`updateDataModel.path` 是结构 Pointer、`createSurface.styles` 只允许外壳形状字段；`createSurface.width/height` 声明后作为 warning 提示删除（渲染实际尺寸由 root 承担） |
-| `ComponentValidator` | `protocol.json` → `commonTopLevelFields` / `componentCommonRequiredFields` / `componentNonEmptyRequiredFields` / `componentTopLevelFields` / `componentRequiredFields` / `forbiddenComponentFields` / `templateComponents` / `templateChildren.allowedKeys` / `templateChildren.requiredKeys` / `eventHandlerForbiddenFields` / `allowedComponents`（`RuleRegistry.allowed_components`） | 组件 id 唯一、`root` 存在、组件类型在白名单、顶层字段/必填字段满足配置、`onClick` 数量与禁用键、列表循环 children 结构、**root 组件 `styles.width/height` 若声明必须为 `"matchParent"`**（其它组件按数值预算保持数值） |
+| `ComponentValidator` | `protocol.json` → `commonTopLevelFields` / `componentCommonRequiredFields` / `componentNonEmptyRequiredFields` / `componentTopLevelFields` / `componentRequiredFields` / `forbiddenComponentFields` / `templateComponents` / `templateChildren.allowedKeys` / `templateChildren.requiredKeys` / `eventHandlerForbiddenFields` / `allowedComponents`（`RuleRegistry.allowed_components`） | 组件 id 唯一、`root` 存在、组件类型在白名单、顶层字段/必填字段满足配置、`onClick` 数量与禁用键、列表循环 children 结构；root 必须完整声明 `matchParent`、padding12、radius18、clip true 和可证明不透明的有效背景 |
+| `DesignContractValidator` | `layout.json` → `safeAreas` / `skeletons` / `regionLimits` / `primaryRegionRatio` / `compactFallback` / 动作尺寸与余量阈值；复用 `aesthetic.engine` 的固定骨架与数值布局函数 | 无需 `--enable-aesthetic` 即检查一级 region、动作/背板上限、root 两轴安全区预算、固定骨架匹配、四动作网格内部几何、关键容器数值宽高、组间/组内距、Text+action 余量、窄焦点显式定位和 2x2 底部动作 |
 | `CardSpecValidator` | `protocol.json` → `sizes` 键作为允许 `suggestSize`、`cardSpec.topLevelFields` / `requiredFields` / `staticStringLimits` / `dataBindingRequiredFields` / `writeResultToPrefix` | CardSpec 顶层字段、必填、静态字符串上限、`suggestSize` 合法、`dataBindings` 每项必填、`writeResultTo` 前缀与重叠 |
 | `ExpressionValidator` | `expression.json` → `maxLength` / `maxParenDepth` / `bannedVariables` / `bannedOperators` / `bannedKeywords` / `allowedFunctions` | 表达式是否完整包裹、长度、括号深度、禁用变量/操作符/关键字、只允许声明的内置函数；结构字段（id/component/EventHandler.call/as/列表循环 children.path）禁止表达式 |
 | `AssetValidator` | `asset.json` → `forbiddenPatterns` / `allowlist`（作为 `RuleRegistry.asset_allowlist`） | 禁止 http/https、data image、base64；静态模式下资源路径必须在 `asset.json.allowlist` 内；动态模式跳过 allowlist，交给 `EffectiveCapabilityValidator` |
@@ -356,7 +359,7 @@ scripts/
 | Validator | 读取的规则来源 | 主要检查 |
 | --- | --- | --- |
 | `BindingValidator` | `RuleRegistry.capabilities`（从 `rules/schemas/capability.*.schema.json` 加载的静态数据能力）；`rules/schemas/event.click.schema.json` → `functions`；动态模式改读 `context.effective_data_capabilities` | `dataBindings[].capabilityId` 与 `arguments` 是否匹配 capability schema；`writeResultTo` 是否与建议一致；列表循环 `children.path` 指向数组；表达式 JSON Pointer 能否从 `updateDataModel.value` 或 `writeResultTo + outputSchema` 推导；`onClick` 是否符合 `event.click.schema.json` 声明（含 `clickToIntent.intentName/params`） |
-| `CrossValidator` | `RuleRegistry.capabilities`（静态能力 schema） | `dataBindings[].writeResultTo` 根结构是否在 `updateDataModel.value` 初始化；capability 是否声明了 `outputSchema`。尺寸预算不在此 validator 内校验：DSL 单独跑时没有 `suggestSize`；root 与 createSurface 的 `matchParent` 硬约束改由 hard 阶段的 ComponentValidator / ProtocolValidator 承担。 |
+| `CrossValidator` | `RuleRegistry.capabilities`（静态能力 schema） | `dataBindings[].writeResultTo` 根结构是否在 `updateDataModel.value` 初始化；capability 是否声明了 `outputSchema`。root 外壳由 ComponentValidator 检查，固定画布/骨架预算由 DesignContractValidator 检查。 |
 | `EffectiveCapabilityValidator` | 仅动态模式：`context.effective_capabilities`（`data/event/asset`）+ `context.effective_asset_sources` + `context.effective_data_capabilities`；不读 `rules/` | `dataBindings[].capabilityId` 是否在 effective.data；DSL `/data/...` 是否在 effective 数据能力的 `writeResultTo` 覆盖之下；`onClick` 是否与 effective.event 中的 `{call,args}` 精确匹配；`Image.src` / `backgroundImage` 是否命中 effective.asset 解析出的 src |
 
 ### quality 阶段
@@ -371,9 +374,9 @@ scripts/
 
 - `rules/config/protocol.json` → `ProtocolValidator`、`ComponentValidator`、`CardSpecValidator`、`CrossValidator`。其中 `forbiddenComponents` 与 `structureFieldsNoExpression` 目前作为规则声明留存，validator 未直接读取（组件白名单 + 各 validator 里对结构字段的表达式禁令已覆盖等价约束）。
 - `rules/config/expression.json` → `ExpressionValidator`。
-- `rules/config/style.json` → `ProtocolValidator`（`createSurfaceAllowedStyles`）；其余字段目前给模型/文档使用，validator 未直接读。
+- `rules/config/style.json` → `ProtocolValidator`（`createSurfaceAllowedStyles`）与可选 `QualityValidator` / `aesthetic.engine`（受控色板、渐变 pair、可靠主题 review）。
 - `rules/config/asset.json` → `AssetValidator`（含 `RuleRegistry.asset_allowlist` 汇总）。
-- `rules/config/layout.json` → `QualityValidator` / `aesthetic/engine.py`（仅美学模块）。
+- `rules/config/layout.json` → hard 阶段 `DesignContractValidator` / `aesthetic.engine`（安全区、固定骨架、区域/动作/背板预算、比例、降级骨架和动作尺寸）以及可选 `QualityValidator` / `aesthetic.engine`（字号、间距、ring、progress 与质量阈值）。
 - `rules/config/diagnostics.zh-CN.json` → `Reporter`：为 `add()` 未显式传 `message/fixHint` 的诊断提供默认中文文案。
 - `rules/schemas/capability.*.schema.json` → `RuleRegistry.capabilities`，被 `BindingValidator`、`CrossValidator` 用作静态数据能力；动态模式下这些会被 `context.effective_data_capabilities` 覆盖。
 - `rules/schemas/event.click.schema.json` → `BindingValidator._check_event_handlers`。

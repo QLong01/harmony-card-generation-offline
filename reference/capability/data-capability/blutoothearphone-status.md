@@ -61,7 +61,7 @@
 - `arguments` 不传字段；不要自行增加设备名、蓝牙地址或包名等入参。
 - 推荐 `writeResultTo: "/data/earphone"`；UI 访问路径必须由 `writeResultTo + outputSchema` 推导。
 - 常用展示路径：`/data/earphone/isConnected`、`/data/earphone/earphoneName`、`/data/earphone/batteryLevel`、`/data/earphone/chargingStatusDesc`、`/data/earphone/leftBatteryLevel`、`/data/earphone/rightBatteryLevel`、`/data/earphone/updatedAt`。
-- Pixso 2×2 优先展示连接状态和最多两个等尺寸电量环；需要盒、左耳、右耳三项时删减为摘要或详情入口，不外推 2×4 视觉。
+- 2x2 优先展示连接状态和最多两个电量事实；需要盒、左耳、右耳三项时删减为摘要。2x4 可用 `wide-timeseries-strip` 展示最多三项等构状态，但仍只回答同一耳机对象问题。
 - 初始 `updateDataModel` 可以使用示例值；`/data/earphone` 中出现的字段、层级、类型和数值范围必须符合本文 `outputSchema`。示例值只用于首帧展示，不表示已经读取用户真实设备状态：
 
 ```json

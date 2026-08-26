@@ -41,10 +41,10 @@
 
 所有组件对象都写 `id` 和 `component`；下方只列额外字段。
 
-- `Column`：竖向容器；必需 `children`；`children` 为字符串数组或 `{ "componentId": "...", "path": "/items" }`；`itemMargin` 数字 vp；`styles.justifyContent` 取 `start|center|end|spaceAround|spaceBetween|spaceEvenly`，**卡片中推荐 `center`**；`styles.alignItems` 取 `start|center|end`，**卡片中推荐 `center`**。
-- `Row`：横向容器；必需 `children`；`children` 为字符串数组或列表循环对象；`itemMargin` 数字 vp；不写已裁剪的 `wrap`；`styles.justifyContent` 取 `start|center|end|spaceAround|spaceBetween|spaceEvenly`，**卡片中推荐 `center`**；`styles.alignItems` 取 `top|center|bottom`，**卡片中推荐 `center`**。
+- `Column`：竖向容器；必需 `children`；`children` 为字符串数组或 `{ "componentId": "...", "path": "/items" }`；`itemMargin` 数字 vp；`styles.justifyContent` 取 `start|center|end|spaceAround|spaceBetween|spaceEvenly`；`styles.alignItems` 取 `start|center|end`。对齐必须由固定骨架、阅读路径和共同对齐线决定。
+- `Row`：横向容器；必需 `children`；`children` 为字符串数组或列表循环对象；`itemMargin` 数字 vp；不写已裁剪的 `wrap`；`styles.justifyContent` 取 `start|center|end|spaceAround|spaceBetween|spaceEvenly`；`styles.alignItems` 取 `top|center|bottom`。对齐必须由固定骨架、阅读路径和共同对齐线决定。
 - `Stack`：层叠容器，用于光晕、图片背景、叠加内容和进度环；必需 `children`；`children` 为字符串数组；`styles.alignContent` 取 `topStart|top|topEnd|start|center|end|bottomStart|bottom|bottomEnd`。
-- `Text`：文本展示；必需 `content`；`content` 为字符串、数字、完整表达式或 PathBinding；`fontSize` 数字 fp；`fontWeight` 数字 `100..900`，按 100 间隔取值；`fontColor` 取 `#RRGGBB` 或 `#AARRGGBB`；`maxLines`、`minFontSize`、`maxFontSize` 为数字，`minFontSize/maxFontSize` 必须配合 `maxLines` 或布局大小限制才生效；`textOverflow` 只取 `clip|ellipsis`；`textAlign` 取 `start|center|end|justify`。标题、正文和辅助信息按 Pixso 最大行数使用 `ellipsis`；CTA、主值和关键状态不得截断；不要写已裁剪的 `wordBreak` 或 `decoration`。
+- `Text`：文本展示；必需 `content`；`content` 为字符串、数字、完整表达式或 PathBinding；`fontSize` 数字 fp；`fontWeight` 数字 `100..900`，按 100 间隔取值；`fontColor` 取 `#RRGGBB` 或 `#AARRGGBB`；`maxLines`、`minFontSize`、`maxFontSize` 为数字，`minFontSize/maxFontSize` 必须配合 `maxLines` 或布局大小限制才生效；`textOverflow` 只取 `clip|ellipsis`；`textAlign` 取 `start|center|end|justify`。非关键辅助文本可使用 `ellipsis`；显式标题、CTA、主值、日期/时间、状态、价格、数量和联系人等受保护文本不得截断；不要写已裁剪的 `wordBreak` 或 `decoration`。
 - `Image`：图片展示；必需 `src`；`src` 为用户提供或素材库声明的本地/资源路径，也可为完整表达式或 PathBinding 读取已声明资源路径；支持资源路径 SVG，不支持网络 URL 和 base64 内联 SVG data URI；`objectFit` 取 `fill|contain|cover|auto|none|scaleDown|topStart|top|topEnd|start|center|end|bottomStart|bottom|bottomEnd|matrix`；`fillColor` 为图片染色颜色，对 SVG 生效。图片承担主对象或状态识别时必须写明确 `width`、`height` 和 `objectFit`。
 - `Divider`：分隔线；无额外必需字段；属性位于 `styles`：`strokeWidth` 为数字或带单位字符串，`vertical` 为 boolean，`color` 为颜色字符串。只用于真实分隔、时间线或强调线，不做装饰堆叠。
 - `Progress`：进度条或进度环；必需 `value`，`total` 可选；`value/total` 为数字、完整表达式或 PathBinding；`styles.type` 取 `linear|ring|eclipse|scaleRing|capsule`；`styles.color` 只用纯色字符串或完整表达式，不支持 LinearGradient；`styles.strokeWidth` 数字 vp，默认 4.0，仅 `linear|ring|scaleRing` 生效；可写 `backgroundColor` 表达 track；`ring` 和 `scaleRing` 必须有稳定 `width`、`height`。
@@ -147,7 +147,7 @@ EventHandler 结构：
 
 | 样式名 | 说明 | 类型 | 必选 | 支持动态数据类型 | 使用示例 |
 |--------|------|------|------|------|----------|
-| `fontSize` | 字体大小 | 数字，单位 fp，默认 16fp；新生成显式使用 Pixso 字号，不采用默认值 | 否 | 是 | `"fontSize": 14` |
+| `fontSize` | 字体大小 | 数字，单位 fp，默认 16fp；新生成显式使用 Design Compact 字号，不采用默认值 | 否 | 是 | `"fontSize": 14` |
 | `fontWeight` | 字体粗细 | 数字 `[100, 900]`，步长 100，默认 400 | 否 | 是 | `"fontWeight": 700` |
 | `fontColor` | 字体颜色 | `#RRGGBB` 或 `#AARRGGBB` 字符串 | 否 | 是 | `"fontColor": "#333333"` |
 | `textAlign` | 水平对齐 | 枚举：`start`（首部对齐）、`center`（居中）、`end`（尾部对齐）、`justify`（双端对齐）。默认 `start` | 否 | 是 | `"textAlign": "center"` |
@@ -276,7 +276,7 @@ EventHandler 结构：
 
 ## 布局组件
 
-> **对齐原则：优先居中。** 卡片为小尺寸展示场景，布局对齐应优先使用 `center`（居中），避免 `start`/`end`（靠左/靠右）或 `top`/`bottom`（顶部/底部）等偏置对齐，除非用户明确要求边侧布局。居中布局在多种卡片尺寸下视觉更均衡。
+> **对齐原则：按骨架显式定位。** 标题、列表和上下文通常沿阅读方向共享 `start` 边界；主值、ring 或 hero 只有在骨架需要时居中。窄于父容器的主焦点/动作必须由父级 `alignItems` 或全宽 Row/Stack 明确其位置，不能假设组件自身内部对齐会定位它。
 
 以下组件支持通过 `children` 属性的列表循环模式动态生成子组件，机制概述参见 [`protocol.md`](protocol.md) 的列表循环章节。
 
@@ -295,8 +295,8 @@ EventHandler 结构：
 
 | 样式名 | 说明 | 类型 | 必选 | 支持动态数据类型 | 使用示例 |
 |--------|------|------|------|------|----------|
-| `justifyContent` | 垂直方向对齐格式 | 枚举，默认 `start`。`start`（首端对齐）、`center`（居中）、`end`（尾部对齐）、`spaceBetween`（均匀分布，首尾贴边）、`spaceAround`（均匀分布，首尾半间距）、`spaceEvenly`（均匀分布，间距全相等）。**卡片中推荐 `center`** | 否 | 是 | `"justifyContent": "center"` |
-| `alignItems` | 水平方向对齐格式 | 枚举，默认 `start`。`start`（起始端）、`center`（居中）、`end`（尾端）。**卡片中推荐 `center`** | 否 | 是 | `"alignItems": "center"` |
+| `justifyContent` | 垂直方向对齐格式 | 枚举，默认 `start`。`start`（首端对齐）、`center`（居中）、`end`（尾部对齐）、`spaceBetween`（均匀分布，首尾贴边）、`spaceAround`（均匀分布，首尾半间距）、`spaceEvenly`（均匀分布，间距全相等）。按固定骨架选择 | 否 | 是 | `"justifyContent": "start"` |
+| `alignItems` | 水平方向对齐格式 | 枚举，默认 `start`。`start`（起始端）、`center`（居中）、`end`（尾端）。按共同对齐线选择 | 否 | 是 | `"alignItems": "start"` |
 
 支持[通用事件](#通用事件)。
 
@@ -317,8 +317,8 @@ EventHandler 结构：
 
 | 样式名 | 说明 | 类型 | 必选 | 支持动态数据类型 | 使用示例 |
 |--------|------|------|------|------|----------|
-| `justifyContent` | 水平方向对齐格式 | 枚举，默认 `start`。取值同 Column。**卡片中推荐 `center`** | 否 | 是 | `"justifyContent": "center"` |
-| `alignItems` | 垂直方向对齐格式 | 枚举，默认 `center`。`top`（顶部对齐）、`center`（居中）、`bottom`（底部对齐）。**卡片中推荐 `center`** | 否 | 是 | `"alignItems": "center"` |
+| `justifyContent` | 水平方向对齐格式 | 枚举，默认 `start`。取值同 Column。按固定骨架选择 | 否 | 是 | `"justifyContent": "start"` |
+| `alignItems` | 垂直方向对齐格式 | 枚举，默认 `center`。`top`（顶部对齐）、`center`（居中）、`bottom`（底部对齐）。按共同基线与内容角色选择 | 否 | 是 | `"alignItems": "center"` |
 
 支持[通用事件](#通用事件)。
 
@@ -372,21 +372,21 @@ EventHandler 结构：
 
 ## 最小写法
 
-以下示例只用于固定字段位置，不是预制视觉布局；视觉数值取自 Pixso 0804：
+以下示例只用于固定字段位置，不是预制视觉布局；视觉数值取自 Design Compact 对齐规范：
 
 ```json
-{"id":"title","component":"Text","content":"{{ ${/title} }}","styles":{"fontSize":12,"fontWeight":400,"fontColor":"#E6000000","maxLines":1,"textOverflow":"ellipsis"}}
-{"id":"row","component":"Row","children":["title","action"],"itemMargin":8,"styles":{"justifyContent":"spaceBetween","alignItems":"center"}}
-{"id":"action","component":"Button","label":"打开","styles":{"height":36,"fontSize":14},"onClick":[{"call":"clickToDeeplink","args":{"bundleName":"com.huawei.hmos.settings","abilityName":"com.huawei.hmos.settings.MainAbility","uri":"battery"}}]}
-{"id":"progress","component":"Progress","value":"{{ ${/progress/value} }}","total":"{{ ${/progress/total} }}","styles":{"type":"ring","color":"#64BB5C","strokeWidth":6,"width":52,"height":52}}
+{"id":"title","component":"Text","content":"{{ ${/title} }}","styles":{"width":180,"height":20,"fontSize":12,"fontWeight":600,"fontColor":"#E5000000","maxLines":1}}
+{"id":"row","component":"Row","children":["title","action"],"itemMargin":8,"styles":{"width":296,"height":36,"justifyContent":"start","alignItems":"center"}}
+{"id":"action","component":"Button","label":"打开","styles":{"width":104,"height":36,"fontSize":14,"fontWeight":600,"fontColor":"#FFFFFFFF","backgroundColor":"#FF1769E0","borderRadius":18},"onClick":[{"call":"clickToDeeplink","args":{"bundleName":"com.huawei.hmos.settings","abilityName":"com.huawei.hmos.settings.MainAbility","uri":"battery"}}]}
+{"id":"progress","component":"Progress","value":"{{ ${/progress/value} }}","total":"{{ ${/progress/total} }}","styles":{"type":"ring","color":"#FF64BB5C","strokeWidth":9,"width":64,"height":64}}
 ```
 
 ## 特殊规则
 
 - `children`：普通组件树只写组件 id 字符串数组；列表循环对象只用于 `Row`、`Column`、`List` 的 `children`，对象必须包含 `componentId/path`，可选 `itemVar/indexVar`；`Stack.children` 只用字符串数组。
 - `Image.src` 和 `styles.backgroundImage` 只使用用户提供或素材库声明的本地/资源路径；资源路径 SVG 受支持；不支持网络 URL、内联/base64 SVG data URI 或占位图；没有真实资源时省略 `Image`。
-- `backgroundColor`、`linearGradient`、`backgroundImage` 等卡片背景字段写在 root 组件或 root 下真实背景组件，不写进 `createSurface.styles`。
-- 组件默认值只描述协议行为；新生成必须显式使用 `design/pixso-0804-spec.md` 的字号、尺寸、间距和颜色，不得把协议默认值当视觉规范。
+- `backgroundColor`、`linearGradient`、`backgroundImage` 等卡片背景字段必须写在 root 组件；子组件可以承担内容面或装饰，但不能替代 root 背景，也不能把背景写进 `createSurface.styles`。
+- 组件默认值只描述协议行为；新生成必须显式使用 `design/design-compact-aligned-spec.md` 的字号、尺寸、间距和颜色，不得把协议默认值当视觉规范。
 - `Button`：CTA 文本是受保护内容，避免窄固定宽度和省略；可点击按钮必须有已声明的 `onClick` EventHandler，动作能力不明时删除点击行为。
 - `Checkbox`：如需点击行为，必须使用已声明 event capability；不要虚构 `toggleTodo` 一类切换函数。
 - `List`：除非用户请求确实需要重复项，否则优先使用静态紧凑行。

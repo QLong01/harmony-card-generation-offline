@@ -69,7 +69,7 @@
 - `arguments` 不传字段；不要自行增加设备 ID、阈值或充电器参数。
 - 推荐 `writeResultTo: "/data/phoneBattery"`；UI 访问路径必须由 `writeResultTo + outputSchema` 推导。
 - 常用展示路径：`/data/phoneBattery/batterySOC`、`/data/phoneBattery/batterySOCText`、`/data/phoneBattery/chargingStatusDesc`、`/data/phoneBattery/batteryCapacityLevelDesc`、`/data/phoneBattery/healthStatusDesc`、`/data/phoneBattery/batteryTemperatureText`、`/data/phoneBattery/updatedAt`。
-- Pixso 2×2 只保留电量主值和 1–2 条关键状态；温度、电流、电压等额外指标降级为详情入口，不外推 2×4 视觉。
+- 2x2 只保留电量主值和 1–2 条关键状态；2x4 可用 `wide-metric-detail-action` 保留一个主值和最多三条支撑。温度、电流、电压等只有直接服务当前判断时才进入卡片。
 - 初始 `updateDataModel` 可以使用示例值；`/data/phoneBattery` 中出现的字段、层级、类型和数值范围必须符合本文 `outputSchema`。示例值只用于首帧展示，不表示已经读取用户真实电池状态：
 
 ```json

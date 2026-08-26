@@ -1,60 +1,41 @@
-# 布局系统（Pixso 0804）
+# 布局系统
 
-布局唯一依据是 [`pixso-0804-spec.md`](pixso-0804-spec.md) 的“2×2 卡片骨架”“原子文字”“图像与图表原子”。本文只说明如何把这些规则落到 Form DSL，不另建构图模板。
+权威来源是 [`design-compact-aligned-spec.md`](design-compact-aligned-spec.md)。本文只说明完整 Form DSL 的落地要点。
 
-## 适用边界
+## 画布
 
-- Pixso 0804 只给出 2×2 视觉规范。新生成的视觉合规尺寸为 `160vp × 160vp`；不得把规则外推成 2×4 自由布局。
-- Form 协议仍允许 2×4，用于修复或协议解释；若用户要求新生成 2×4，说明缺少 Pixso 2×4 几何，或收敛成 2×2。
-- root 使用 `padding: 8`，可用内容区为 `144vp × 144vp`。root 的 `borderRadius: 18`、`clip: true` 是当前 Form 协议约束，不是自由视觉变量。
+- 2x2：160×160，root padding12，内部 136×136。
+- 2x4：320×160，root padding12，内部 296×136。
+- root `borderRadius: 18`、`clip: true`、显式背景。
 
-## 写 DSL 前的固定顺序
+## 骨架路由
 
-1. 选择 Pixso 背景分支：浅色指定场景、通用/应用背景，或四个特殊全幅渐变之一。
-2. 建必选标题区：12fp 标题；需要且满足来源条件时再放右上 `20×20vp` icon。
-3. 判断是否需要按钮：胶囊按钮 `36vp` 高；纯 icon 按钮 `30×30vp`，中心 icon `16×16vp`。
-4. 在标题区和按钮区扣除后，为内容区选择 Pixso 分支：单文本、单图片、图片 + 文本、图片 + 两文本或两文本。
-5. 按原子规范选择普通文字、大数值、单选列表视觉、环形图或线性进度条。
-6. 核对所有 `8vp/4vp/2vp` 间隔、固定宽高、最大行数和按钮底部位置。
+2x2：`compact-metric-action`、`compact-event-action`、`compact-date-next`、`compact-dual-fact`、`compact-dual-item-summary`。
 
-## 几何硬门槛
+2x4：`wide-hero-context`、`wide-timeseries-strip`、`wide-agenda-stack`、`wide-metric-detail-action`、`wide-dual-domain`、`wide-four-action-hub`。
 
-- 间距只用 `0/2/4/8/12/16vp`；结构间距优先 `4vp`、`8vp`。
-- 内容区距标题区、按钮区都至少 `8vp`。
-- 图文横排中间 `8vp`；宽高比至少 2:1 的图片触发上下排，带按钮时 `8vp`，无按钮时 `4vp`。
-- 胶囊按钮高 `36vp`，距卡片左右边至少 `12vp`；文字 14fp，最低 12fp；可选 icon `20vp`。
-- 纯 icon 按钮背景 `30vp`，中心 icon `16vp`。
-- 标题右上 icon `20vp`、圆角 `4vp`；标题与 icon 间隔 `4vp`；有 icon 时标题文字区最大宽度 `112vp`。
-- ring 默认 `52vp`、最小 `44vp`、粗 `6vp`；中心 icon `24vp`。
-- 线性进度条 1–2 条时粗 `8vp`、文字间隔 `8vp`；3 条时粗 `4vp`、文字间隔 `4vp`。
+精确预算见主规范。骨架只约束区域关系，不是预制 JSON 模板。
 
-## 字号硬门槛
+## DSL 预算规则
 
-只允许 Pixso 中出现的 `10/12/14/16/20/30/38fp`：
+- 间距只用 `2/4/6/8/10/12/14/16`；组间距不小于组内距。
+- 内部板圆角8–12，主要支撑板12–16，胶囊半高圆角。
+- 每个 Row/Column 两轴都必须闭合；Text/Button 行留至少4vp水平余量。
+- `spaceBetween/spaceAround/spaceEvenly` 不与 `itemMargin` 同时使用。
+- 新生成的短列表优先固定组件/索引，避免运行时项数破坏固定画布；合法动态 List 仅用于修复或已知严格上限场景。
+- Stack 只用于背景、进度或必要叠加，不覆盖受保护文本和动作。
 
-- 10fp：辅助信息，最多一行。
-- 12fp：标题区、单位、小字号正文/标题降级。
-- 14fp：常规标题/正文、胶囊按钮。
-- 16fp：环形图中心数值。
-- 20fp：大字体文字标题。
-- 30fp：双数值，或单数值宽度不足时的降级。
-- 38fp：单一核心数值。
+## 文本与图形
 
-不要生成旧版 18/32/40fp。降级顺序必须按 Pixso：删除描述/辅助信息或使用对应原子的小字号档，不把字号降到表外。
-
-## 协议映射
-
-- Pixso 单选 radio 视觉用 `Checkbox` 且 `shape: "circle"`，或用本地 Image + Text 组合；禁止输出协议不支持的 `Radio`。
-- Pixso 背景“白底 + 10% 渐变叠层”若无法在一个 styles 内同时表达：root 写白底，首个全尺寸 Stack/Column 子组件写线性渐变，内容置于其上。
-- 所有 Image 显式写 `width`、`height`、`objectFit: "contain"`；应用/品牌 icon 不染色，单色功能 icon 按 Pixso 角色设置 `fillColor`。
-- Row/Column 的固定元素宽高、margin、padding、itemMargin 必须可静态求和；不得借默认伸缩掩盖溢出。
+- 字号：10/12/14/16/18/20/32/40；每卡最多三档。
+- 胶囊动作36高、18圆角、14/600；独立 icon 动作30，中心16–20。
+- 常规 icon16–24；header20；hero 2x2为40–56、2x4为48–72。
+- ring 56–72，stroke为直径14%–15%；线性进度1–2行高8、3行高4。
+- Image 显式 width/height/objectFit。
 
 ## 阻断项
 
-- 2×2 root 不是 `padding: 8`。
-- 字号、间距、按钮、icon、ring 或进度条尺寸不在上述值内。
-- 有按钮但未贴底，或内容与标题/按钮不足 8vp。
-- 使用自由比例带、dashboard、按钮网格、卡片套卡片、装饰性 Stack 或未经 Pixso 定义的 2×4 构图。
-- CTA、主值或关键状态依靠裁剪成立，或标题/正文/辅助信息没有按 Pixso 设置最大行数与省略策略。
-
-完整分支、最大行数和宽度规则见 [`pixso-0804-spec.md`](pixso-0804-spec.md)，不得只凭本文摘要生成。
+- root 不是 padding12，或尺寸/安全区与 CardSpec 不一致。
+- 无法命名固定骨架，或区域/动作/背板超预算。
+- 受保护文本裁剪，或两轴预算不成立。
+- 自由 dashboard、多层卡片套卡片、任意按钮网格、装饰性空白填充。

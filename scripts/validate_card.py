@@ -69,7 +69,7 @@ def main() -> int:
     parser.add_argument(
         "--enable-aesthetic",
         action="store_true",
-        help="Enable the aesthetic quality validator (still under alignment with offline content).",
+        help="Enable optional contrast, controlled-palette and aesthetic quality checks.",
     )
     args = parser.parse_args()
 

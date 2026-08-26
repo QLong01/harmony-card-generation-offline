@@ -34,21 +34,27 @@
   },
   "imageRequiredStyles": ["width", "height", "objectFit"],
   "imageDefaultObjectFit": "contain",
-  "pixsoAllowedStaticColors": [
-    "#FFFFFF", "#99FFFFFF", "#E6000000", "#99000000", "#66000000", "#1A000000",
-    "#0A59F7", "#1A0A59F7", "#E84026", "#1AE84026", "#64BB5C", "#1A64BB5C",
-    "#A5D61D", "#F9A01E", "#1AF9A01E", "#F7CE00", "#317AF7", "#46B1E3",
-    "#46484D", "#467794", "#ED6F21", "#AC49F5", "#C386F0", "#00FFFFFF"
+  "allowSemanticThemeOverrides": true,
+  "designCompactAllowedStaticColors": [
+    "#F5F7F9", "#FFFFFF", "#F1F3F5",
+    "#FFE9DE", "#FFFCF8", "#FFF5EF", "#E56A3A",
+    "#DCEEFF", "#F4FAFF", "#EAF4FF", "#1769E0", "#0A59F7", "#46B1E3",
+    "#E2F6EE", "#F8FCFA", "#E1F4ED", "#0F8F78", "#64BB5C",
+    "#F2E8FF", "#FCF9FF", "#F5EEFF", "#8A4DCC", "#AC49F5", "#C386F0",
+    "#FFEDD6", "#FFFAF2", "#FFF3E5", "#ED6F21", "#F9A01E",
+    "#E5000000", "#99000000", "#66000000", "#19000000", "#0C000000",
+    "#33FFFFFF", "#19FFFFFF", "#99FFFFFF", "#46484D", "#467794"
   ],
-  "pixsoAllowedGradientPairs": [
-    ["#1A0A59F7", "#00FFFFFF"],
-    ["#1AE84026", "#00FFFFFF"],
-    ["#1A000000", "#00FFFFFF"],
-    ["#1A64BB5C", "#00FFFFFF"],
-    ["#1AF9A01E", "#00FFFFFF"],
-    ["#317AF7", "#46B1E3"],
+  "designCompactAllowedGradientPairs": [
+    ["#F5F7F9", "#FFFFFF"],
+    ["#FFE9DE", "#FFFCF8"],
+    ["#DCEEFF", "#F4FAFF"],
+    ["#E2F6EE", "#F8FCFA"],
+    ["#F2E8FF", "#FCF9FF"],
+    ["#FFEDD6", "#FFFAF2"],
+    ["#0A59F7", "#46B1E3"],
+    ["#AC49F5", "#C386F0"],
     ["#46484D", "#467794"],
-    ["#ED6F21", "#F9A01E"],
-    ["#AC49F5", "#C386F0"]
+    ["#ED6F21", "#F9A01E"]
   ]
 }

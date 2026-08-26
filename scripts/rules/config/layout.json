@@ -1,27 +1,64 @@
 {
-  "visualAuthority": "reference/design/pixso-0804-spec.md",
-  "pixsoSource": "https://pixso.cn/app/design/sTEzUn-GOOGP6NK6fNI0hg?file_type=10&icon_type=1&page-id=0%3A1",
-  "visualGenerationSizes": ["2x2"],
-  "defaultPadding": 8,
-  "allowedFontSizes": [10, 12, 14, 16, 20, 30, 38],
-  "allowedSpacing": [0, 2, 4, 8, 12, 16],
-  "minClickableSize": 30,
+  "visualAuthority": "reference/design/design-compact-aligned-spec.md",
+  "upstreamPrompt": "https://github.com/linfachen-lff/CreateMyCard/blob/dev/widget_service/cloud/data/protocol_profiles/design-compact-dsl/PROMPT.md",
+  "upstreamCommit": "91e8be400099189756f3c9d7d0f6614387d40c02",
+  "visualGenerationSizes": ["2x2", "2x4"],
+  "defaultPadding": 12,
+  "safeAreas": {
+    "2x2": {"width": 136, "height": 136},
+    "2x4": {"width": 296, "height": 136}
+  },
+  "skeletons": {
+    "2x2": {
+      "compact-metric-action": {"maxRegions": 3, "maxActions": 1, "headerHeight": 20, "heroHeightRange": [56, 64], "actionHeight": 36},
+      "compact-event-action": {"maxRegions": 3, "maxActions": 1, "headerHeight": 20, "heroHeightRange": [56, 64], "actionHeight": 36},
+      "compact-date-next": {"maxRegions": 3, "maxActions": 0, "primaryHeightRange": [48, 56], "secondaryHeightRange": [56, 72]},
+      "compact-dual-fact": {"maxRegions": 2, "maxActions": 0, "headerHeight": 20, "contentHeight": 108, "itemWidth": 62, "itemGap": 8},
+      "compact-dual-item-summary": {"maxRegions": 2, "maxActions": 0, "headerHeight": 20, "contentHeight": 108, "itemHeight": 52, "itemGap": 4}
+    },
+    "2x4": {
+      "wide-hero-context": {"maxRegions": 2, "maxActions": 1, "columnWidths": [104, 180], "columnGap": 8},
+      "wide-timeseries-strip": {"maxRegions": 3, "maxActions": 1, "headerHeight": 20, "seriesCountRange": [3, 5], "itemGap": 8},
+      "wide-agenda-stack": {"maxRegions": 3, "maxActions": 1, "headerHeight": 20, "noActionListHeight": 108, "actionListHeight": 64, "actionHeight": 36},
+      "wide-metric-detail-action": {"maxRegions": 3, "maxActions": 2, "columnWidths": [104, 180], "columnGap": 8, "maxSupportFacts": 3},
+      "wide-dual-domain": {"maxRegions": 2, "maxActions": 1, "columnWidths": [142, 142], "columnGap": 8},
+      "wide-four-action-hub": {"maxRegions": 2, "minActions": 3, "maxActions": 4, "headerHeight": 20, "gridHeight": 104, "rowHeight": 48, "gap": 8, "itemWidth": 142}
+    }
+  },
+  "regionLimits": {
+    "2x2": {"maxRegions": 3, "maxActions": 1, "maxContentSurfaces": 1},
+    "2x4": {"maxRegions": 4, "defaultMaxActions": 2, "maxContentSurfaces": 2}
+  },
+  "primaryRegionRatio": {
+    "2x2Height": [0.4, 0.55],
+    "2x4Width": [0.4, 0.62]
+  },
+  "compactFallback": {
+    "withAction": {"header": 20, "heroRange": [56, 64], "action": 36, "maxSupportInsideHero": 1},
+    "withoutAction": {"header": 20, "heroRange": [56, 64], "supportRange": [16, 28], "maxSupportGroups": 1}
+  },
+  "allowedFontSizes": [10, 12, 14, 16, 18, 20, 32, 40],
+  "maxFontSizeLevels": 3,
+  "allowedSpacing": [2, 4, 6, 8, 10, 12, 14, 16],
+  "preferredSpacing": [4, 8, 12, 16],
+  "minClickableSize": 24,
   "pillButtonHeight": 36,
+  "pillButtonRadius": 18,
   "iconButtonSize": 30,
-  "iconButtonGlyphSize": 16,
-  "titleIconSize": 20,
-  "titleIconRadius": 4,
-  "titleTextMaxWidthWithIcon": 112,
-  "ringDefaultSize": 52,
-  "ringMinSize": 44,
-  "ringStrokeWidth": 6,
-  "ringCenterIconSize": 24,
-  "progressStrokeWidth1To2": 8,
-  "progressStrokeWidth3": 4,
-  "maxMeaninglessWhitespace": 16,
+  "iconButtonGlyphSizes": [16, 20],
+  "headerIconSize": 20,
+  "semanticIconSizes": [16, 20, 24],
+  "heroIconRanges": {
+    "2x2": [40, 56],
+    "2x4": [48, 72]
+  },
+  "ringSizeRange": [56, 72],
+  "ringStrokeRatioRange": [0.14, 0.15],
+  "linearProgressHeight1To2": 8,
+  "linearProgressHeight3": 4,
+  "minHorizontalSlack": 4,
   "maxGradientStops": 2,
-  "pixsoTruncatableTextOverflow": ["ellipsis"],
-  "criticalTextOverflowAllowed": [],
+  "protectedTextOverflowAllowed": [],
   "qualityWeights": {
     "protocol": 25,
     "layout": 25,

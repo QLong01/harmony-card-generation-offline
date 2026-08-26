@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-from .base import BaseValidator, expression_like, is_empty_required_value, is_json_pointer
+from .base import (
+    BaseValidator,
+    expression_like,
+    is_empty_required_value,
+    is_json_pointer,
+    resolve_dimension,
+)
 
 
 class ComponentValidator(BaseValidator):
@@ -121,6 +127,20 @@ class ComponentValidator(BaseValidator):
             if forbidden:
                 reporter.add("error", "DSL_FIELD_FORBIDDEN", "hard", "genui", line=2, json_pointer=pointer, actual=forbidden, message="组件包含禁用字段。")
             handlers = component.get("onClick")
+            if component_type == "Button" and not (
+                isinstance(handlers, list) and handlers
+            ):
+                reporter.add(
+                    "error",
+                    "EVENT_BUTTON_HANDLER_REQUIRED",
+                    "hard",
+                    "genui",
+                    line=2,
+                    json_pointer=f"{pointer}/onClick",
+                    actual=handlers,
+                    expected="一个已声明 EventHandler",
+                    message="Button 是动作视觉，必须绑定真实 onClick；无动作能力时删除 Button。",
+                )
             if isinstance(handlers, list):
                 if len(handlers) > 1:
                     reporter.add(
@@ -170,12 +190,29 @@ class ComponentValidator(BaseValidator):
             if styles is not None and not isinstance(styles, dict):
                 reporter.add("error", "DSL_COMPONENT_REQUIRED_FIELD", "hard", "genui", line=2, json_pointer=f"{pointer}/styles", actual=styles, message="styles 必须是 object。")
 
-            # root 组件是唯一卡片 shell：宽高必须写 "matchParent"，实际预算由内部组件承担。
-            # 其它组件继续按数值 / 可静态推导的约束保持数值宽高。
-            if isinstance(styles, dict) and component_id is not None and component_id == context.root_id:
+            # root 是唯一卡片 shell。Design Compact 的外壳字段属于 hard
+            # contract，不能只在可选美学阶段检查。
+            if component_id is not None and component_id == context.root_id:
+                if not isinstance(styles, dict):
+                    reporter.add(
+                        "error",
+                        "STYLE_ROOT_REQUIRED",
+                        "hard",
+                        "genui",
+                        line=2,
+                        json_pointer=f"{pointer}/styles",
+                        actual=styles,
+                        expected={
+                            "width": "matchParent",
+                            "height": "matchParent",
+                            "padding": 12,
+                            "borderRadius": 18,
+                            "clip": True,
+                        },
+                        message="root 组件必须提供完整 styles 外壳。",
+                    )
+                    continue
                 for style_field in ("width", "height"):
-                    if style_field not in styles:
-                        continue
                     raw = styles.get(style_field)
                     if isinstance(raw, str) and raw.strip() == "matchParent":
                         continue
@@ -188,8 +225,51 @@ class ComponentValidator(BaseValidator):
                         json_pointer=f"{pointer}/styles/{style_field}",
                         actual=raw,
                         expected="matchParent",
-                        message="root 组件的 styles.width/height 必须写 \"matchParent\"，实际尺寸预算由内部组件数值承担。",
+                        message="root 组件必须显式写 styles.width/height = \"matchParent\"。",
                         fix_hint=f'把 root.styles.{style_field} 设为 "matchParent"，删除具体数值。',
+                    )
+                for style_field, expected_value in (
+                    ("padding", 12),
+                    ("borderRadius", 18),
+                ):
+                    raw = styles.get(style_field)
+                    if resolve_dimension(raw) == float(expected_value):
+                        continue
+                    reporter.add(
+                        "error",
+                        "STYLE_ROOT_SHELL_INVALID",
+                        "hard",
+                        "genui",
+                        line=2,
+                        json_pointer=f"{pointer}/styles/{style_field}",
+                        actual=raw,
+                        expected=expected_value,
+                        message=f"root.styles.{style_field} 必须固定为 {expected_value}。",
+                    )
+                if styles.get("clip") is not True:
+                    reporter.add(
+                        "error",
+                        "STYLE_ROOT_SHELL_INVALID",
+                        "hard",
+                        "genui",
+                        line=2,
+                        json_pointer=f"{pointer}/styles/clip",
+                        actual=styles.get("clip"),
+                        expected=True,
+                        message="root.styles.clip 必须显式写 true。",
+                    )
+                background_fields = ("backgroundColor", "linearGradient", "backgroundImage")
+                if not _has_opaque_root_background(styles):
+                    reporter.add(
+                        "error",
+                        "STYLE_ROOT_BACKGROUND_REQUIRED",
+                        "hard",
+                        "genui",
+                        line=2,
+                        json_pointer=f"{pointer}/styles",
+                        expected=list(background_fields),
+                        message="root 必须显式提供可证明不透明的背景、受控渐变或已声明背景素材。",
+                        fix_hint="在 root.styles 中选择 backgroundColor、linearGradient 或 backgroundImage。",
                     )
 
             children = component.get("children")
@@ -217,3 +297,37 @@ class ComponentValidator(BaseValidator):
                             reporter.add("error", "DSL_TEMPLATE_CHILDREN_INVALID", "hard", "genui", line=2, json_pointer=f"{pointer}/children/{var_field}", actual=var_name, message=f"{var_field} 必须是不带 $ 前缀的非空变量名。")
                 else:
                     reporter.add("error", "DSL_TEMPLATE_CHILDREN_INVALID", "hard", "genui", line=2, json_pointer=f"{pointer}/children", actual=children, message="children 必须是组件 id 数组或模板循环对象。")
+
+
+def _has_opaque_root_background(styles: dict) -> bool:
+    background_image = styles.get("backgroundImage")
+    if isinstance(background_image, str) and background_image.strip():
+        return True
+    if _is_opaque_hex(styles.get("backgroundColor")):
+        return True
+    gradient = styles.get("linearGradient")
+    if not isinstance(gradient, dict) or not isinstance(gradient.get("colors"), list):
+        return False
+    stops = gradient["colors"]
+    return len(stops) == 2 and all(
+        isinstance(stop, list)
+        and len(stop) == 2
+        and _is_opaque_hex(stop[0])
+        and isinstance(stop[1], (int, float))
+        and not isinstance(stop[1], bool)
+        and 0 <= stop[1] <= 1
+        for stop in stops
+    )
+
+
+def _is_opaque_hex(value: object) -> bool:
+    if not isinstance(value, str) or not value.startswith("#"):
+        return False
+    raw = value[1:]
+    if len(raw) == 6:
+        return all(character in "0123456789abcdefABCDEF" for character in raw)
+    if len(raw) == 8:
+        return raw[:2].upper() == "FF" and all(
+            character in "0123456789abcdefABCDEF" for character in raw
+        )
+    return False

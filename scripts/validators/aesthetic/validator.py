@@ -54,7 +54,23 @@ class QualityValidator(BaseValidator):
         # ------------------------------------------------------------------
         # Run the aesthetic engine
         # ------------------------------------------------------------------
-        report = analyze(context.dsl_text, thresholds)
+        style_rules = getattr(rules, "style", {}) or {}
+        design_rules = dict(layout_rules)
+        design_rules.update({
+            "suggestSize": context.cardspec.get("suggestSize")
+            if isinstance(context.cardspec, dict)
+            else None,
+            "allowedColors": style_rules.get(
+                "designCompactAllowedStaticColors", []
+            ),
+            "allowedGradientPairs": style_rules.get(
+                "designCompactAllowedGradientPairs", []
+            ),
+            "allowSemanticThemeOverrides": style_rules.get(
+                "allowSemanticThemeOverrides", False
+            ),
+        })
+        report = analyze(context.dsl_text, thresholds, design_rules)
 
         # ------------------------------------------------------------------
         # Forward every diagnostic to the pipeline reporter

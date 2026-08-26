@@ -154,7 +154,7 @@
 - 适用于当前位置天气、指定区县天气、未来 1 到 5 天预报、空气质量、感冒指数、紫外线、风力和预警等天气速览。
 - CardSpec 的 `capabilityId` 使用本文档 manifest 的 `id`：`ViewWeather`。
 - `arguments` 只能使用 `inputSchema.properties` 声明的字段：`districtName`、`prefectureName`、`forecastDays`；其中 `districtName` 是必填字段。
-- `forecastDays` 在 Pixso 2×2 中取 1；更长预报进入详情，不外推 2×4 视觉。
+- `forecastDays` 在 2x2 中取 1；2x4 的 `wide-timeseries-strip` 可取 3–5，但重复单元必须等构并满足每项宽度预算。更长预报进入详情。
 - CardSpec 通常使用 `writeResultTo: "/data/weather"`；UI 访问路径必须由 `writeResultTo + outputSchema` 推导。
 - 常用当前天气路径：`/data/weather/current/temperatureText`、`/data/weather/current/condition`、`/data/weather/current/airQuality`、`/data/weather/current/humidityPercent`、`/data/weather/current/windDirection`、`/data/weather/current/windLevel`、`/data/weather/current/uvIndex`、`/data/weather/current/coldLevel`、`/data/weather/current/alertLevel`。
 - 地点路径使用 `/data/weather/location/districtName`、`/data/weather/location/prefectureName` 或 `/data/weather/location/cityCode`。

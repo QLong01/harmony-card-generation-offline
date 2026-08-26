@@ -14,6 +14,7 @@ from .cardspec_validator import CardSpecValidator
 from .component_validator import ComponentValidator
 from .cross_validator import CrossValidator
 from .diagnostics import Reporter
+from .design_contract_validator import DesignContractValidator
 from .effective_capability_validator import EffectiveCapabilityValidator
 from .expression_validator import ExpressionValidator
 from .protocol_validator import ProtocolValidator
@@ -22,6 +23,7 @@ from .protocol_validator import ProtocolValidator
 STATIC_VALIDATORS = [
     ProtocolValidator(),
     ComponentValidator(),
+    DesignContractValidator(),
     CardSpecValidator(),
     ExpressionValidator(),
     AssetValidator(),
@@ -48,9 +50,9 @@ def selected_stages(stage: str) -> list[str]:
         return ["hard"]
     if stage == "semantic":
         return ["hard", "semantic"]
-    # "quality" and "all" both run every stage. Without ColorValidator the
-    # quality stage is empty by default; it only carries diagnostics when
-    # ``enable_aesthetic`` is turned on and QualityValidator joins the pipeline.
+    # "quality" and "all" both run every stage. Deterministic fixed-layout
+    # contracts already run in hard; optional quality adds contrast and style
+    # diagnostics when ``enable_aesthetic`` is turned on.
     return ["hard", "semantic", "quality"]
 
 

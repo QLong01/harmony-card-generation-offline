@@ -117,7 +117,7 @@
 - 适用于今日会议、未来日程、倒计时、日历提醒、赛事日程等系统日历场景。
 - CardSpec 的 `capabilityId` 使用本文档 manifest 的 `id`：`GetCalendarEvents`。
 - `arguments` 只能使用 `inputSchema.properties` 声明的字段：`futureDays`；不传时端侧默认查询未来 7 天。
-- Pixso 2×2 只展示下一项或今日首个关键日程；其余日程降级为摘要或详情入口，不外推 2×4 列表。
+- 2x2 使用 `compact-event-action` 展示下一项，或用 `compact-dual-item-summary` 展示恰好两项；2x4 使用 `wide-agenda-stack` 展示 2–3 项。更长日程进入详情。
 - 推荐 `writeResultTo: "/data/calendar"`；UI 访问路径必须由 `writeResultTo + outputSchema` 推导。
 - 常用展示路径：`/data/calendar/eventCount`、`/data/calendar/events`、`/data/calendar/events/0/title`、`/data/calendar/events/0/dtStart`、`/data/calendar/events/0/dtEnd`、`/data/calendar/events/0/eventLocation`、`/data/calendar/events/0/countdownDays`。
 - 事件参数常用 `/data/calendar/events/0/entityId` 或列表循环项内 `entityId`；必须配合已声明事件能力使用。

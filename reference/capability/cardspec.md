@@ -31,7 +31,7 @@ Agent 负责选择已声明能力、生成参数、设计 DataModel 初始结构
 
 - `title` 必须是用户可见的静态短标题，建议不超过 8 个字符，不能写表达式、绑定或 DataModel 路径。
 - `description` 必须是用户可见的静态短概述，建议不超过 12 个字符，不能写表达式、绑定或 DataModel 路径。
-- `suggestSize` 必须与 DSL 尺寸一致，协议只允许 `"2x2"` 或 `"2x4"`；Pixso 0804 新生成只使用 `"2x2"`，`"2x4"` 仅用于既有产物的协议修复/解释。
+- `suggestSize` 必须与 DSL 尺寸一致，协议只允许 `"2x2"` 或 `"2x4"`；用户指定尺寸时不得自动升降，未指定时默认 `"2x2"`。
 - 动态卡片必须包含 `dataBindings`；每个 `dataBindings[]` 表示一次端侧能力调用。
 - `capabilityId` 必须来自 [`data-capability/`](data-capability/) 中选定能力 manifest 的 `id`。
 - `arguments` 只能使用该能力 `inputSchema.properties` 声明的字段；不要沿用旧示例参数或自行改名。
@@ -85,6 +85,6 @@ Agent 负责选择已声明能力、生成参数、设计 DataModel 初始结构
 - 所有 UI 访问字段都能从 `writeResultTo + outputSchema` 推导。
 - 事件参数若来自数据能力输出，也能从同一 DataModel 路径推导；事件能力本身不写入 CardSpec。
 - `updateDataModel.value` 初始化了 `/data/...` 根结构和必要状态；若提供示例初始值，能力子树是对应 `outputSchema` 的合法投影，数组项符合 `items`。
-- 数组字段使用列表循环，不展开成固定重复组件。
+- 新生成的短列表优先使用固定组件/索引锁定几何；修复既有动态 List 时可以保留合法循环，但必须证明项数上限和固定画布预算。
 - CardSpec 不包含 DSL catalog、组件规则、事件能力或示例结构的替代定义。
 - 不暴露意图框架原始返回结构；示例初始值不得伪装成已经获取的真实用户隐私数据。

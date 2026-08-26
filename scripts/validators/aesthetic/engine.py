@@ -111,6 +111,7 @@ class AestheticContext:
     components_by_id: dict[str, dict[str, Any]]
     source_index_by_id: dict[str, int]
     parent_by_child: dict[str, str]
+    root_id: str
 
 
 def read_text(path: str) -> str:
@@ -266,6 +267,7 @@ def prepare_context(raw: str) -> tuple[AestheticContext | None, list[dict[str, A
             components_by_id=components_by_id,
             source_index_by_id=source_index_by_id,
             parent_by_child=parent_by_child,
+            root_id=root_id,
         ),
         [],
     )
@@ -295,8 +297,49 @@ def has_parent_cycle(parent_by_child: dict[str, str], component_ids: set[str]) -
     return False
 
 
-def analyze(raw: str, thresholds: Thresholds | None = None) -> dict[str, Any]:
+def analyze(
+    raw: str,
+    thresholds: Thresholds | None = None,
+    design_rules: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     thresholds = thresholds or Thresholds()
+    design_rules = design_rules or {}
+    allowed_colors = frozenset(
+        normalized
+        for value in design_rules.get(
+            "allowedColors", DESIGN_COMPACT_ALLOWED_COLORS
+        )
+        if isinstance(value, str)
+        and (normalized := normalize_design_compact_hex(value)) is not None
+    )
+    allowed_gradient_pairs = frozenset(
+        tuple(normalized_pair)
+        for pair in design_rules.get(
+            "allowedGradientPairs", DESIGN_COMPACT_ALLOWED_GRADIENT_PAIRS
+        )
+        if isinstance(pair, (list, tuple))
+        and len(pair) == 2
+        and all(isinstance(value, str) for value in pair)
+        and len(
+            normalized_pair := [
+                normalize_design_compact_hex(value) for value in pair
+            ]
+        )
+        == 2
+        and all(value is not None for value in normalized_pair)
+    )
+    allowed_font_sizes = frozenset(
+        float(value)
+        for value in design_rules.get(
+            "allowedFontSizes", DESIGN_COMPACT_FONT_SIZES
+        )
+        if numeric(value) is not None
+    )
+    spacing_tokens = frozenset(
+        float(value)
+        for value in design_rules.get("allowedSpacing", SPACING_TOKENS)
+        if numeric(value) is not None
+    )
     context, diagnostics = prepare_context(raw)
     if context is None:
         return build_report([], 0, 0, diagnostics, thresholds)
@@ -430,14 +473,48 @@ def analyze(raw: str, thresholds: Thresholds | None = None) -> dict[str, Any]:
 
     diagnostics.extend(evaluate_palette_complexity(context, thresholds))
     diagnostics.extend(evaluate_color_role_consistency(context))
-    diagnostics.extend(evaluate_pixso_color_palette(context))
+    diagnostics.extend(
+        evaluate_design_compact_color_palette(
+            context,
+            allowed_colors,
+            allowed_gradient_pairs,
+            allow_theme_overrides=bool(
+                design_rules.get("allowSemanticThemeOverrides", False)
+            ),
+        )
+    )
     diagnostics.extend(evaluate_gradient_complexity(context, thresholds))
     diagnostics.extend(evaluate_alpha_stack_complexity(context, thresholds))
-    diagnostics.extend(evaluate_typography_system(context, thresholds))
-    diagnostics.extend(evaluate_pixso_geometry(context))
+    diagnostics.extend(
+        evaluate_typography_system(context, thresholds, allowed_font_sizes)
+    )
+    diagnostics.extend(
+        evaluate_design_compact_geometry(
+            context,
+            default_padding=float(design_rules.get("defaultPadding", 12)),
+            pill_button_height=float(design_rules.get("pillButtonHeight", 36)),
+            pill_button_radius=float(design_rules.get("pillButtonRadius", 18)),
+            ring_size_range=tuple(
+                float(value)
+                for value in design_rules.get("ringSizeRange", (56, 72))
+            ),
+            ring_stroke_ratio_range=tuple(
+                float(value)
+                for value in design_rules.get(
+                    "ringStrokeRatioRange", (0.14, 0.15)
+                )
+            ),
+            linear_progress_widths=frozenset(
+                {
+                    float(design_rules.get("linearProgressHeight1To2", 8)),
+                    float(design_rules.get("linearProgressHeight3", 4)),
+                }
+            ),
+        )
+    )
     diagnostics.extend(evaluate_style_consistency(context, thresholds))
     diagnostics.extend(evaluate_surface_nesting(context, thresholds))
-    diagnostics.extend(evaluate_spacing_tokens(context))
+    diagnostics.extend(evaluate_spacing_tokens(context, spacing_tokens))
     diagnostics.extend(evaluate_fixed_layout_overflow(context))
     diagnostics.extend(evaluate_static_text_clip_risk(context))
     diagnostics.extend(evaluate_action_target_size(context))
@@ -464,42 +541,58 @@ COLOR_STYLE_FIELDS = (
 )
 
 
-PIXSO_ALLOWED_COLORS = frozenset(
+DESIGN_COMPACT_ALLOWED_COLORS = frozenset(
     {
+        "#F5F7F9",
         "#FFFFFF",
+        "#F1F3F5",
+        "#FFE9DE",
+        "#FFFCF8",
+        "#FFF5EF",
+        "#E56A3A",
+        "#DCEEFF",
+        "#F4FAFF",
+        "#EAF4FF",
+        "#1769E0",
+        "#E2F6EE",
+        "#F8FCFA",
+        "#E1F4ED",
+        "#0F8F78",
+        "#F2E8FF",
+        "#FCF9FF",
+        "#F5EEFF",
+        "#8A4DCC",
+        "#FFEDD6",
+        "#FFFAF2",
+        "#FFF3E5",
         "#99FFFFFF",
-        "#E6000000",
+        "#E5000000",
         "#99000000",
         "#66000000",
-        "#1A000000",
+        "#19000000",
+        "#0C000000",
+        "#33FFFFFF",
+        "#19FFFFFF",
         "#0A59F7",
-        "#1A0A59F7",
-        "#E84026",
-        "#1AE84026",
         "#64BB5C",
-        "#1A64BB5C",
-        "#A5D61D",
         "#F9A01E",
-        "#1AF9A01E",
-        "#F7CE00",
-        "#317AF7",
         "#46B1E3",
         "#46484D",
         "#467794",
         "#ED6F21",
         "#AC49F5",
         "#C386F0",
-        "#00FFFFFF",
     }
 )
-PIXSO_ALLOWED_GRADIENT_PAIRS = frozenset(
+DESIGN_COMPACT_ALLOWED_GRADIENT_PAIRS = frozenset(
     {
-        ("#1A0A59F7", "#00FFFFFF"),
-        ("#1AE84026", "#00FFFFFF"),
-        ("#1A000000", "#00FFFFFF"),
-        ("#1A64BB5C", "#00FFFFFF"),
-        ("#1AF9A01E", "#00FFFFFF"),
-        ("#317AF7", "#46B1E3"),
+        ("#F5F7F9", "#FFFFFF"),
+        ("#FFE9DE", "#FFFCF8"),
+        ("#DCEEFF", "#F4FAFF"),
+        ("#E2F6EE", "#F8FCFA"),
+        ("#F2E8FF", "#FCF9FF"),
+        ("#FFEDD6", "#FFFAF2"),
+        ("#0A59F7", "#46B1E3"),
         ("#46484D", "#467794"),
         ("#ED6F21", "#F9A01E"),
         ("#AC49F5", "#C386F0"),
@@ -507,11 +600,18 @@ PIXSO_ALLOWED_GRADIENT_PAIRS = frozenset(
 )
 
 
-def evaluate_pixso_color_palette(context: AestheticContext) -> list[dict[str, Any]]:
-    """Reject static colors and gradient pairs outside the Pixso 0804 board."""
+def evaluate_design_compact_color_palette(
+    context: AestheticContext,
+    allowed_colors: frozenset[str],
+    allowed_gradient_pairs: frozenset[tuple[str, str]],
+    *,
+    allow_theme_overrides: bool = False,
+) -> list[dict[str, Any]]:
+    """Reject static colors and gradient pairs outside the aligned controlled palettes."""
 
     color_violations: list[dict[str, Any]] = []
     gradient_violations: list[dict[str, Any]] = []
+    theme_gradient_reviews: list[dict[str, Any]] = []
     for component in context.components:
         component_id = component.get("id")
         styles = component.get("styles")
@@ -520,8 +620,8 @@ def evaluate_pixso_color_palette(context: AestheticContext) -> list[dict[str, An
         for field in COLOR_STYLE_FIELDS + ("fillColor",):
             value = styles.get(field)
             if isinstance(value, str) and value.startswith("#"):
-                normalized = normalize_pixso_hex(value)
-                if normalized is None or normalized not in PIXSO_ALLOWED_COLORS:
+                normalized = normalize_design_compact_hex(value)
+                if normalized is None or normalized not in allowed_colors:
                     color_violations.append(
                         {"componentId": component_id, "field": field, "value": value}
                     )
@@ -536,45 +636,67 @@ def evaluate_pixso_color_palette(context: AestheticContext) -> list[dict[str, An
             if not (isinstance(stop, list) and stop and isinstance(stop[0], str)):
                 pair = []
                 break
-            normalized = normalize_pixso_hex(stop[0])
+            normalized = normalize_design_compact_hex(stop[0])
             if normalized is None:
                 pair = []
                 break
             pair.append(normalized)
-        if len(pair) != 2 or tuple(pair) not in PIXSO_ALLOWED_GRADIENT_PAIRS:
-            gradient_violations.append(
-                {"componentId": component_id, "colors": pair or stops}
-            )
+        if len(pair) != 2 or tuple(pair) not in allowed_gradient_pairs:
+            item = {"componentId": component_id, "colors": pair or stops}
+            if allow_theme_overrides and reliable_theme_gradient_pair(pair):
+                theme_gradient_reviews.append(item)
+            else:
+                gradient_violations.append(item)
 
     diagnostics: list[dict[str, Any]] = []
     if color_violations:
         diagnostics.append(
             diagnostic(
-                "warning",
-                "PIXSO_COLOR_NOT_IN_SPEC",
-                "静态颜色未出现在 Pixso 0804 色板中。",
+                "info" if allow_theme_overrides else "warning",
+                (
+                    "DESIGN_COMPACT_THEME_COLOR_REVIEW"
+                    if allow_theme_overrides
+                    else "DESIGN_COMPACT_COLOR_NOT_IN_SPEC"
+                ),
+                (
+                    "静态颜色不在默认色板中；它只有在可靠应用/对象主题来源明确时才允许。"
+                    if allow_theme_overrides
+                    else "静态颜色未出现在 Design Compact 受控色板中。"
+                ),
                 json_pointer="/updateComponents/components",
                 actual={"violations": color_violations},
-                expected={"allowedColors": sorted(PIXSO_ALLOWED_COLORS)},
-                fix_hint="改用 Pixso 场景分支的精确 hex；应用主色等外部来源需人工复核。",
+                expected={"allowedColors": sorted(allowed_colors)},
+                fix_hint="从同一受控色族整组选择 canvas/surface/accent；可靠应用主色需人工复核。",
             )
         )
     if gradient_violations:
         diagnostics.append(
             diagnostic(
                 "warning",
-                "PIXSO_GRADIENT_PAIR_NOT_ALLOWED",
-                "线性渐变不是 Pixso 0804 定义的两色组合。",
+                "DESIGN_COMPACT_GRADIENT_PAIR_NOT_ALLOWED",
+                "线性渐变既不在默认 pair 中，也不能证明为同族弱主题渐变。",
                 json_pointer="/updateComponents/components",
                 actual={"violations": gradient_violations},
-                expected={"allowedPairs": [list(pair) for pair in sorted(PIXSO_ALLOWED_GRADIENT_PAIRS)]},
-                fix_hint="选择一个 Pixso 浅色叠层或四个特殊全幅渐变之一，不添加第三 stop。",
+                expected={"allowedPairs": [list(pair) for pair in sorted(allowed_gradient_pairs)]},
+                fix_hint="选择一个受控 canvas；可靠应用/对象主题也必须保持两个同族 stop，禁止跨色族渐变。",
+            )
+        )
+    if theme_gradient_reviews:
+        diagnostics.append(
+            diagnostic(
+                "info",
+                "DESIGN_COMPACT_THEME_GRADIENT_REVIEW",
+                "渐变可证明为同族弱主题组合，但仍需确认颜色确实来自可靠应用/对象主题。",
+                json_pointer="/updateComponents/components",
+                actual={"violations": theme_gradient_reviews},
+                expected="可靠主题来源 + 恰好两个同族浅色 stop",
+                fix_hint="保留来源证据；来源不可靠时改用默认受控 pair。",
             )
         )
     return diagnostics
 
 
-def normalize_pixso_hex(value: str) -> str | None:
+def normalize_design_compact_hex(value: str) -> str | None:
     raw = value.strip().upper()
     if re.fullmatch(r"#[0-9A-F]{6}", raw):
         return raw
@@ -583,6 +705,42 @@ def normalize_pixso_hex(value: str) -> str | None:
     if raw.startswith("#FF"):
         return "#" + raw[3:]
     return raw
+
+
+def reliable_theme_gradient_pair(pair: list[str]) -> bool:
+    """Conservatively recognize a two-stop weak, same-family theme gradient."""
+
+    if len(pair) != 2:
+        return False
+    colors = [parse_hex_color(value) for value in pair]
+    if any(color is None or color[3] < 0.999 for color in colors):
+        return False
+    opaque = [color for color in colors if color is not None]
+    if any(max(color[:3]) < 0.82 for color in opaque):
+        return False
+
+    def hue_and_chroma(color: RGBA) -> tuple[float | None, float]:
+        red, green, blue, _ = color
+        maximum = max(red, green, blue)
+        minimum = min(red, green, blue)
+        chroma = maximum - minimum
+        if chroma < 1e-9:
+            return None, chroma
+        if maximum == red:
+            hue = ((green - blue) / chroma) % 6
+        elif maximum == green:
+            hue = (blue - red) / chroma + 2
+        else:
+            hue = (red - green) / chroma + 4
+        return hue * 60, chroma
+
+    first_hue, first_chroma = hue_and_chroma(opaque[0])
+    second_hue, second_chroma = hue_and_chroma(opaque[1])
+    if first_chroma < 0.02 or second_chroma < 0.02:
+        return max(first_chroma, second_chroma) <= 0.18
+    distance = abs((first_hue or 0.0) - (second_hue or 0.0))
+    distance = min(distance, 360.0 - distance)
+    return distance <= 30.0 and max(first_chroma, second_chroma) <= 0.18
 
 
 def evaluate_palette_complexity(
@@ -666,7 +824,7 @@ def evaluate_gradient_complexity(
                 "maxGradientSurfaces": thresholds.max_gradient_surfaces,
                 "maxGradientStops": thresholds.max_gradient_stops,
             },
-            fix_hint="2×2 卡片优先保留一个渐变面，且使用 2–3 个有明确场景角色的 stop。",
+            fix_hint="卡片最多保留一个主渐变面，并使用恰好两个同色族 stop。",
         )
     ]
 
@@ -779,7 +937,9 @@ def has_translucent_surface(styles: dict[str, Any]) -> bool:
 
 
 def evaluate_typography_system(
-    context: AestheticContext, thresholds: Thresholds
+    context: AestheticContext,
+    thresholds: Thresholds,
+    allowed_font_sizes: frozenset[float],
 ) -> list[dict[str, Any]]:
     font_sizes: dict[float, list[str]] = {}
     text_weights: list[tuple[str, float]] = []
@@ -811,14 +971,14 @@ def evaluate_typography_system(
     unsupported_sizes = {
         size: component_ids
         for size, component_ids in sorted(font_sizes.items())
-        if size not in PIXSO_FONT_SIZES
+        if size not in allowed_font_sizes
     }
     if unsupported_sizes:
         diagnostics.append(
             diagnostic(
                 "warning",
-                "PIXSO_TYPO_SIZE_NOT_ALLOWED",
-                "字号不在 Pixso 0804 的固定字号集合内。",
+                "DESIGN_COMPACT_TYPO_SIZE_NOT_ALLOWED",
+                "字号不在 Design Compact 的固定字号集合内。",
                 json_pointer="/updateComponents/components",
                 actual={
                     "componentIdsBySize": {
@@ -826,8 +986,8 @@ def evaluate_typography_system(
                         for size, component_ids in unsupported_sizes.items()
                     }
                 },
-                expected={"allowedFontSizes": sorted(PIXSO_FONT_SIZES)},
-                fix_hint="按文字原子改为 10/12/14/16/20/30/38fp；不要使用旧版 18/32/40fp。",
+                expected={"allowedFontSizes": sorted(allowed_font_sizes)},
+                fix_hint="改为 10/12/14/16/18/20/32/40fp；同一卡片最多保留三档。",
             )
         )
     if len(font_sizes) > thresholds.max_font_size_levels:
@@ -980,12 +1140,23 @@ def evaluate_surface_nesting(
     ]
 
 
-PIXSO_FONT_SIZES = frozenset({10.0, 12.0, 14.0, 16.0, 20.0, 30.0, 38.0})
-SPACING_TOKENS = frozenset({0.0, 2.0, 4.0, 8.0, 12.0, 16.0})
+DESIGN_COMPACT_FONT_SIZES = frozenset(
+    {10.0, 12.0, 14.0, 16.0, 18.0, 20.0, 32.0, 40.0}
+)
+SPACING_TOKENS = frozenset({2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0})
 
 
-def evaluate_pixso_geometry(context: AestheticContext) -> list[dict[str, Any]]:
-    """Check deterministic geometry values transcribed from Pixso 0804."""
+def evaluate_design_compact_geometry(
+    context: AestheticContext,
+    *,
+    default_padding: float,
+    pill_button_height: float,
+    pill_button_radius: float,
+    ring_size_range: tuple[float, ...],
+    ring_stroke_ratio_range: tuple[float, ...],
+    linear_progress_widths: frozenset[float],
+) -> list[dict[str, Any]]:
+    """Check deterministic geometry values from the aligned Design Compact rules."""
 
     diagnostics: list[dict[str, Any]] = []
     root_ids = [
@@ -998,16 +1169,16 @@ def evaluate_pixso_geometry(context: AestheticContext) -> list[dict[str, Any]]:
         root = context.components_by_id[root_id]
         styles = root.get("styles") if isinstance(root, dict) else None
         padding = styles.get("padding") if isinstance(styles, dict) else None
-        if numeric(padding) != 8.0:
+        if numeric(padding) != default_padding:
             diagnostics.append(
                 diagnostic(
                     "warning",
-                    "PIXSO_ROOT_PADDING_MISMATCH",
-                    "2×2 root 的安全区必须使用 Pixso 0804 的 8vp。",
+                    "DESIGN_COMPACT_ROOT_PADDING_MISMATCH",
+                    "2x2 与 2x4 root 都必须使用 Design Compact 的 12vp 安全区。",
                     json_pointer=f"/updateComponents/components/{context.source_index_by_id[root_id]}/styles/padding",
                     actual={"componentId": root_id, "padding": padding},
-                    expected=8,
-                    fix_hint="将 root.styles.padding 改为 8，并按 144×144vp 内容区重算布局。",
+                    expected=default_padding,
+                    fix_hint="将 root.styles.padding 改为 12，并按 2x2 的 136×136vp 或 2x4 的 296×136vp 内容区重算布局。",
                 )
             )
 
@@ -1020,16 +1191,29 @@ def evaluate_pixso_geometry(context: AestheticContext) -> list[dict[str, Any]]:
         source_index = context.source_index_by_id.get(component_id)
         if component_type == "Button":
             height = numeric(styles.get("height"))
-            if height != 36.0:
+            radius = numeric(styles.get("borderRadius"))
+            if height != pill_button_height:
                 diagnostics.append(
                     diagnostic(
                         "warning",
-                        "PIXSO_BUTTON_HEIGHT_MISMATCH",
-                        "胶囊按钮高度必须为 Pixso 0804 的 36vp。",
+                        "DESIGN_COMPACT_BUTTON_HEIGHT_MISMATCH",
+                        "默认胶囊按钮高度必须为 Design Compact 的 36vp。",
                         json_pointer=f"/updateComponents/components/{source_index}/styles/height",
                         actual={"componentId": component_id, "height": styles.get("height")},
-                        expected=36,
-                        fix_hint="将 Button 高度改为 36；纯 icon 操作用带 onClick 的 30×30vp 容器复现。",
+                        expected=pill_button_height,
+                        fix_hint="将 Button 高度改为 36；独立 icon 操作用带 onClick 的 30×30vp 容器复现。",
+                    )
+                )
+            if radius != pill_button_radius:
+                diagnostics.append(
+                    diagnostic(
+                        "warning",
+                        "DESIGN_COMPACT_BUTTON_RADIUS_MISMATCH",
+                        "默认胶囊按钮必须使用配置定义的完整圆角。",
+                        json_pointer=f"/updateComponents/components/{source_index}/styles/borderRadius",
+                        actual={"componentId": component_id, "borderRadius": styles.get("borderRadius")},
+                        expected=pill_button_radius,
+                        fix_hint="使用与 36vp 按钮高度配套的 18vp 圆角。",
                     )
                 )
         if component_type != "Progress":
@@ -1039,12 +1223,27 @@ def evaluate_pixso_geometry(context: AestheticContext) -> list[dict[str, Any]]:
         if progress_type == "ring":
             width = numeric(styles.get("width"))
             height = numeric(styles.get("height"))
-            if width not in {44.0, 52.0} or height != width or stroke_width != 6.0:
+            stroke_ratio = (
+                stroke_width / width
+                if width is not None and width > 0 and stroke_width is not None
+                else None
+            )
+            if (
+                width is None
+                or len(ring_size_range) != 2
+                or width < ring_size_range[0]
+                or width > ring_size_range[1]
+                or height != width
+                or stroke_ratio is None
+                or len(ring_stroke_ratio_range) != 2
+                or stroke_ratio < ring_stroke_ratio_range[0]
+                or stroke_ratio > ring_stroke_ratio_range[1]
+            ):
                 diagnostics.append(
                     diagnostic(
                         "warning",
-                        "PIXSO_RING_GEOMETRY_MISMATCH",
-                        "环形图必须使用 Pixso 0804 的 52vp 默认档或 44vp 最小档，环粗 6vp。",
+                        "DESIGN_COMPACT_RING_GEOMETRY_MISMATCH",
+                        "环形图直径必须为 56–72vp，stroke 为直径的 14%–15%。",
                         json_pointer=f"/updateComponents/components/{source_index}/styles",
                         actual={
                             "componentId": component_id,
@@ -1052,19 +1251,22 @@ def evaluate_pixso_geometry(context: AestheticContext) -> list[dict[str, Any]]:
                             "height": styles.get("height"),
                             "strokeWidth": styles.get("strokeWidth"),
                         },
-                        expected={"size": [44, 52], "strokeWidth": 6},
-                        fix_hint="改为 52×52×6vp；空间不足时只允许 44×44×6vp。",
+                        expected={
+                            "sizeRange": list(ring_size_range),
+                            "strokeRatioRange": list(ring_stroke_ratio_range),
+                        },
+                        fix_hint="在 56–72vp 内选择正方形直径，并将 strokeWidth 调整为直径的 14%–15%。",
                     )
                 )
-        elif progress_type == "linear" and stroke_width not in {4.0, 8.0}:
+        elif progress_type == "linear" and stroke_width not in linear_progress_widths:
             diagnostics.append(
                 diagnostic(
                     "warning",
-                    "PIXSO_PROGRESS_STROKE_MISMATCH",
+                    "DESIGN_COMPACT_PROGRESS_STROKE_MISMATCH",
                     "线性进度条粗细必须为 8vp（1–2 条）或 4vp（3 条）。",
                     json_pointer=f"/updateComponents/components/{source_index}/styles/strokeWidth",
                     actual={"componentId": component_id, "strokeWidth": styles.get("strokeWidth")},
-                    expected=[4, 8],
+                    expected=sorted(linear_progress_widths),
                     fix_hint="按同组进度条数量选择 8vp 或 4vp。",
                 )
             )
@@ -1072,7 +1274,920 @@ def evaluate_pixso_geometry(context: AestheticContext) -> list[dict[str, Any]]:
     return diagnostics
 
 
-def evaluate_spacing_tokens(context: AestheticContext) -> list[dict[str, Any]]:
+def evaluate_fixed_skeleton(
+    context: AestheticContext,
+    *,
+    suggest_size: object,
+    layout_rules: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Validate the deterministic outer geometry shared by all fixed skeletons.
+
+    The DSL has no skeleton-name field, so this check recognizes the allowed
+    outer region relationships instead of requiring a template identifier.
+    """
+
+    root = context.components_by_id.get(context.root_id, {})
+    root_type = root.get("component")
+    root_styles = root.get("styles")
+    if not isinstance(root_styles, dict):
+        return []  # hard validation owns the missing root shell diagnostic.
+
+    size = infer_card_size(context, suggest_size)
+    skeleton_rules = layout_rules.get("skeletons", {})
+    if not isinstance(skeleton_rules, dict):
+        skeleton_rules = {}
+    safe_areas = layout_rules.get("safeAreas", {})
+    size_safe_area = safe_areas.get(size, {}) if isinstance(safe_areas, dict) else {}
+    safe_width = rule_number(
+        size_safe_area, "width", 136.0 if size == "2x2" else 296.0
+    )
+    safe_height = rule_number(size_safe_area, "height", 136.0)
+    region_limits = layout_rules.get("regionLimits", {})
+    size_region_limits = (
+        region_limits.get(size, {}) if isinstance(region_limits, dict) else {}
+    )
+    action_height = rule_number(layout_rules, "pillButtonHeight", 36.0)
+    icon_button_size = rule_number(layout_rules, "iconButtonSize", 30.0)
+    min_horizontal_slack = rule_number(layout_rules, "minHorizontalSlack", 4.0)
+    raw_children = root.get("children")
+    if not isinstance(raw_children, list):
+        return [
+            diagnostic(
+                "warning",
+                "DESIGN_COMPACT_SKELETON_UNRESOLVED",
+                "root 必须使用可静态枚举的一级 region，才能验证固定骨架。",
+                json_pointer=f"/updateComponents/components/{context.source_index_by_id[context.root_id]}/children",
+                actual=raw_children,
+                expected="root.children 为固定组件 id 数组",
+                fix_hint="新生成的短列表使用固定组件/索引；不要把 root 一级 region 设为动态模板。",
+            )
+        ]
+
+    child_ids = [
+        child_id
+        for child_id in raw_children
+        if isinstance(child_id, str) and child_id in context.components_by_id
+    ]
+    child_components = [context.components_by_id[child_id] for child_id in child_ids]
+    diagnostics: list[dict[str, Any]] = []
+
+    region_limit = int(
+        rule_number(size_region_limits, "maxRegions", 3.0 if size == "2x2" else 4.0)
+    )
+    if len(child_components) > region_limit:
+        diagnostics.append(
+            diagnostic(
+                "warning",
+                "DESIGN_COMPACT_REGION_LIMIT_EXCEEDED",
+                "root 一级 region 数量超过固定画布上限。",
+                json_pointer=f"/updateComponents/components/{context.source_index_by_id[context.root_id]}/children",
+                actual={"size": size, "regions": child_ids},
+                expected={"maxRegions": region_limit},
+                fix_hint="合并到现有 region，或删除最低优先级的 shouldKeep；弱 footer 也计为 region。",
+            )
+        )
+
+    action_ids = [
+        component_id
+        for component_id, component in context.components_by_id.items()
+        if component_id != context.root_id
+        and is_action_container(component)
+        and is_effectively_visible(
+            component_id, context.components_by_id, context.parent_by_child
+        )
+    ]
+    hub = size == "2x4" and looks_like_four_action_hub(
+        context,
+        child_components,
+        action_ids,
+        (skeleton_rules.get("2x4") or {}).get("wide-four-action-hub", {}),
+        safe_width,
+    )
+    wide_body_action = size == "2x4" and looks_like_wide_body_action(
+        context,
+        root_type,
+        child_components,
+        action_ids,
+        skeleton_rules,
+        action_height,
+    )
+    max_actions = int(
+        rule_number(size_region_limits, "maxActions", 1.0)
+        if size == "2x2"
+        else (
+            rule_number(
+                (skeleton_rules.get("2x4") or {}).get("wide-four-action-hub", {}),
+                "maxActions",
+                4.0,
+            )
+            if hub
+            else rule_number(size_region_limits, "defaultMaxActions", 2.0)
+        )
+    )
+    if len(action_ids) > max_actions:
+        diagnostics.append(
+            diagnostic(
+                "warning",
+                "DESIGN_COMPACT_ACTION_LIMIT_EXCEEDED",
+                "显式动作数量超过所选尺寸/骨架上限。",
+                json_pointer="/updateComponents/components",
+                actual={"size": size, "actionIds": action_ids},
+                expected={"maxActions": max_actions},
+                fix_hint="保留用户明确要求的动作；3–4项只允许满足固定几何的 wide-four-action-hub。",
+            )
+        )
+
+    surface_ids = [
+        component_id
+        for component_id, component in context.components_by_id.items()
+        if component_id != context.root_id
+        and component.get("component") in {"Row", "Column", "List", "Stack"}
+        and not is_action_container(component)
+        and isinstance(component.get("styles"), dict)
+        and any(
+            field in component["styles"]
+            for field in ("backgroundColor", "linearGradient", "borderWidth", "shadow")
+        )
+        and is_effectively_visible(
+            component_id, context.components_by_id, context.parent_by_child
+        )
+    ]
+    max_surfaces = int(
+        rule_number(
+            size_region_limits, "maxContentSurfaces", 1.0 if size == "2x2" else 2.0
+        )
+    )
+    if len(surface_ids) > max_surfaces:
+        diagnostics.append(
+            diagnostic(
+                "warning",
+                "DESIGN_COMPACT_SURFACE_LIMIT_EXCEEDED",
+                "内部内容背板数量超过固定画布上限。",
+                json_pointer="/updateComponents/components",
+                actual={"surfaceIds": surface_ids},
+                expected={"maxContentSurfaces": max_surfaces},
+                fix_hint="列表项用间距、排版或 Divider 分组，只保留一个主背板和允许的弱辅助背板。",
+            )
+        )
+
+    if root_type not in {"Row", "Column"}:
+        diagnostics.append(
+            diagnostic(
+                "warning",
+                "DESIGN_COMPACT_SKELETON_UNRESOLVED",
+                "固定骨架的一级 region 应由 Row 或 Column 明确组织。",
+                json_pointer=f"/updateComponents/components/{context.source_index_by_id[context.root_id]}/component",
+                actual=root_type,
+                expected=["Row", "Column"],
+            )
+        )
+        return diagnostics
+
+    axis = "width" if root_type == "Row" else "height"
+    safe_axis = safe_width if axis == "width" else safe_height
+    cross_axis = "height" if axis == "width" else "width"
+    safe_cross_axis = safe_height if cross_axis == "height" else safe_width
+    child_sizes = [
+        numeric((component.get("styles") or {}).get(axis))
+        if isinstance(component.get("styles"), dict)
+        else None
+        for component in child_components
+    ]
+    if any(value is None for value in child_sizes):
+        diagnostics.append(
+            diagnostic(
+                "warning",
+                "DESIGN_COMPACT_SKELETON_UNRESOLVED",
+                "root 的每个一级 region 都必须声明数值主轴尺寸。",
+                json_pointer=f"/updateComponents/components/{context.source_index_by_id[context.root_id]}/children",
+                actual={"axis": axis, "sizes": child_sizes},
+                expected="所有一级 region 主轴尺寸为静态数值",
+            )
+        )
+        return diagnostics
+
+    justify = root_styles.get("justifyContent", "start")
+    raw_gap = numeric(root.get("itemMargin"))
+    gap = 0.0 if justify in {"spaceBetween", "spaceAround", "spaceEvenly"} else (raw_gap or 0.0)
+    main_axis_margins = [
+        spacing_axis_total((component.get("styles") or {}).get("margin"), axis)
+        if isinstance(component.get("styles"), dict)
+        else None
+        for component in child_components
+    ]
+    occupied = (
+        sum(value for value in child_sizes if value is not None)
+        + sum(value or 0.0 for value in main_axis_margins)
+        + gap * max(len(child_sizes) - 1, 0)
+    )
+    if occupied > safe_axis + 1e-9:
+        diagnostics.append(
+            diagnostic(
+                "warning",
+                "DESIGN_COMPACT_ROOT_BUDGET_OVERFLOW",
+                "root 一级 region 超过安全内容区预算。",
+                json_pointer=f"/updateComponents/components/{context.source_index_by_id[context.root_id]}",
+                actual={"size": size, "axis": axis, "occupied": occupied},
+                expected={"maximum": safe_axis},
+                fix_hint="删除/合并 region 或缩减 shouldKeep；spaceBetween 不能修复负剩余空间。",
+            )
+        )
+
+    for child_id, component in zip(child_ids, child_components):
+        styles = component.get("styles")
+        cross_size = numeric(styles.get(cross_axis)) if isinstance(styles, dict) else None
+        cross_margin = (
+            spacing_axis_total(styles.get("margin"), cross_axis)
+            if isinstance(styles, dict)
+            else None
+        )
+        if cross_size is None or cross_margin is None:
+            diagnostics.append(
+                diagnostic(
+                    "warning",
+                    "DESIGN_COMPACT_ROOT_CROSS_AXIS_UNRESOLVED",
+                    "root 一级 region 必须声明可静态验证的交叉轴尺寸与 margin。",
+                    json_pointer=f"/updateComponents/components/{context.source_index_by_id.get(child_id)}/styles",
+                    actual={"componentId": child_id, "axis": cross_axis},
+                    expected={"maximum": safe_cross_axis},
+                )
+            )
+            continue
+        if cross_size + cross_margin > safe_cross_axis + 1e-9:
+            diagnostics.append(
+                diagnostic(
+                    "warning",
+                    "DESIGN_COMPACT_ROOT_CROSS_AXIS_OVERFLOW",
+                    "root 一级 region 超过安全内容区的交叉轴预算。",
+                    json_pointer=f"/updateComponents/components/{context.source_index_by_id.get(child_id)}/styles/{cross_axis}",
+                    actual={
+                        "componentId": child_id,
+                        "axis": cross_axis,
+                        "size": cross_size,
+                        "margin": cross_margin,
+                    },
+                    expected={"maximum": safe_cross_axis},
+                    fix_hint="缩减该 region 或其 margin，确保 width/height 两轴都落在安全区内。",
+                )
+            )
+
+    if not outer_regions_match_fixed_skeleton(
+        size,
+        root_type,
+        child_sizes,
+        gap,
+        action_ids,
+        hub,
+        wide_body_action,
+        skeleton_rules,
+        safe_width,
+        safe_height,
+        action_height,
+        min_horizontal_slack,
+        layout_rules.get("compactFallback", {}),
+    ):
+        diagnostics.append(
+            diagnostic(
+                "warning",
+                "DESIGN_COMPACT_FIXED_SKELETON_MISMATCH",
+                "一级 region 几何无法映射到任何固定骨架。",
+                json_pointer=f"/updateComponents/components/{context.source_index_by_id[context.root_id]}",
+                actual={
+                    "size": size,
+                    "layout": root_type,
+                    "regionSizes": child_sizes,
+                    "gap": gap,
+                    "actionCount": len(action_ids),
+                },
+                expected={"skeletons": sorted((skeleton_rules.get(size) or {}).keys())},
+                fix_hint="按信息关系选择一个固定骨架；没有骨架能承载时先删除 shouldKeep。",
+            )
+        )
+
+    if size == "2x2" and action_ids and root_type == "Column":
+        diagnostics.extend(
+            evaluate_compact_action_slot(
+                context,
+                child_ids,
+                child_components,
+                child_sizes,
+                gap,
+                justify,
+                action_ids,
+                safe_height,
+                action_height,
+                icon_button_size,
+            )
+        )
+    return diagnostics
+
+
+def infer_card_size(context: AestheticContext, suggest_size: object) -> str:
+    if suggest_size in {"2x2", "2x4"}:
+        return str(suggest_size)
+    widest = max(
+        (
+            numeric((component.get("styles") or {}).get("width")) or 0.0
+            for component in context.components
+            if isinstance(component.get("styles"), dict)
+        ),
+        default=0.0,
+    )
+    return "2x4" if widest > 136.0 else "2x2"
+
+
+def looks_like_four_action_hub(
+    context: AestheticContext,
+    child_components: list[dict[str, Any]],
+    action_ids: list[str],
+    hub_rules: dict[str, Any],
+    safe_width: float,
+) -> bool:
+    header_height = rule_number(hub_rules, "headerHeight", 20.0)
+    grid_height = rule_number(hub_rules, "gridHeight", 104.0)
+    row_height = rule_number(hub_rules, "rowHeight", 48.0)
+    gap = rule_number(hub_rules, "gap", 8.0)
+    item_width = rule_number(hub_rules, "itemWidth", 142.0)
+    min_actions = int(rule_number(hub_rules, "minActions", 3.0))
+    max_actions = int(rule_number(hub_rules, "maxActions", 4.0))
+    heights = [
+        numeric((component.get("styles") or {}).get("height"))
+        if isinstance(component.get("styles"), dict)
+        else None
+        for component in child_components
+    ]
+    if not (
+        min_actions <= len(action_ids) <= max_actions
+        and len(heights) == 2
+        and heights[0] == header_height
+        and heights[1] == grid_height
+    ):
+        return False
+    grid = child_components[1]
+    grid_styles = grid.get("styles")
+    if (
+        grid.get("component") != "Column"
+        or not isinstance(grid_styles, dict)
+        or numeric(grid_styles.get("width")) != safe_width
+        or numeric(grid.get("itemMargin")) != gap
+    ):
+        return False
+    row_ids = child_component_ids(grid)
+    if len(row_ids) != 2:
+        return False
+    item_ids: list[str] = []
+    for row_id in row_ids:
+        row = context.components_by_id.get(row_id, {})
+        row_styles = row.get("styles")
+        if (
+            row.get("component") != "Row"
+            or not isinstance(row_styles, dict)
+            or numeric(row_styles.get("width")) != safe_width
+            or numeric(row_styles.get("height")) != row_height
+        ):
+            return False
+        row_items = child_component_ids(row)
+        if len(row_items) not in {1, 2}:
+            return False
+        if len(row_items) == 2 and numeric(row.get("itemMargin")) != gap:
+            return False
+        for item_id in row_items:
+            item = context.components_by_id.get(item_id, {})
+            item_styles = item.get("styles")
+            if (
+                not is_action_container(item)
+                or not isinstance(item_styles, dict)
+                or numeric(item_styles.get("width")) != item_width
+                or numeric(item_styles.get("height")) != row_height
+            ):
+                return False
+            item_ids.append(item_id)
+    pair_slack = safe_width - item_width * 2 - gap
+    return (
+        min_actions <= len(item_ids) <= max_actions
+        and pair_slack >= 4.0
+        and set(item_ids) == set(action_ids)
+    )
+
+
+def looks_like_wide_body_action(
+    context: AestheticContext,
+    root_type: object,
+    child_components: list[dict[str, Any]],
+    action_ids: list[str],
+    skeleton_rules: dict[str, Any],
+    action_height: float,
+) -> bool:
+    if root_type != "Column" or len(child_components) != 2 or not action_ids:
+        return False
+    body, action_slot = child_components
+    body_styles = body.get("styles")
+    action_styles = action_slot.get("styles")
+    if (
+        body.get("component") != "Row"
+        or not isinstance(body_styles, dict)
+        or not isinstance(action_styles, dict)
+        or not 84.0 <= (numeric(body_styles.get("height")) or 0.0) <= 98.0
+        or numeric(action_styles.get("height")) != action_height
+    ):
+        return False
+    wide_rules = skeleton_rules.get("2x4", {}) if isinstance(skeleton_rules, dict) else {}
+    metric_rules = wide_rules.get("wide-metric-detail-action", {})
+    hero_rules = wide_rules.get("wide-hero-context", {})
+    dual_rules = wide_rules.get("wide-dual-domain", {})
+    column_gap = rule_number(metric_rules, "columnGap", rule_number(hero_rules, "columnGap", 8.0))
+    if numeric(body.get("itemMargin")) != column_gap:
+        return False
+    columns = [
+        context.components_by_id.get(child_id, {})
+        for child_id in child_component_ids(body)
+    ]
+    widths = [
+        numeric((column.get("styles") or {}).get("width"))
+        if isinstance(column.get("styles"), dict)
+        else None
+        for column in columns
+    ]
+    asymmetric = sorted(
+        float(value) for value in metric_rules.get(
+            "columnWidths", hero_rules.get("columnWidths", [104, 180])
+        )
+    )
+    symmetric = [
+        float(value) for value in dual_rules.get("columnWidths", [142, 142])
+    ]
+    return len(widths) == 2 and (
+        sorted(widths) == asymmetric or widths == symmetric
+    )
+
+
+def outer_regions_match_fixed_skeleton(
+    size: str,
+    root_type: object,
+    child_sizes: list[float | None],
+    gap: float,
+    action_ids: list[str],
+    hub: bool,
+    wide_body_action: bool,
+    skeleton_rules: dict[str, Any],
+    safe_width: float,
+    safe_height: float,
+    action_height: float,
+    min_horizontal_slack: float,
+    compact_fallback: dict[str, Any],
+) -> bool:
+    sizes = [float(value) for value in child_sizes if value is not None]
+    if len(sizes) != len(child_sizes):
+        return False
+    compact_rules = (
+        skeleton_rules.get("2x2", {}) if isinstance(skeleton_rules, dict) else {}
+    )
+    wide_rules = (
+        skeleton_rules.get("2x4", {}) if isinstance(skeleton_rules, dict) else {}
+    )
+    if size == "2x2":
+        action_rules = compact_rules.get("compact-metric-action", {})
+        with_action_fallback = (
+            compact_fallback.get("withAction", {})
+            if isinstance(compact_fallback, dict)
+            else {}
+        )
+        without_action_fallback = (
+            compact_fallback.get("withoutAction", {})
+            if isinstance(compact_fallback, dict)
+            else {}
+        )
+        fallback_rules = compact_rules.get("compact-metric-action", {})
+        date_rules = compact_rules.get("compact-date-next", {})
+        dual_fact_rules = compact_rules.get("compact-dual-fact", {})
+        dual_summary_rules = compact_rules.get("compact-dual-item-summary", {})
+        header_height = rule_number(
+            without_action_fallback,
+            "header",
+            rule_number(fallback_rules, "headerHeight", 20.0),
+        )
+        hero_range = number_range(
+            without_action_fallback.get("heroRange"),
+            number_range(fallback_rules.get("heroHeightRange"), (56.0, 64.0)),
+        )
+        support_range = number_range(
+            without_action_fallback.get("supportRange"), (16.0, 28.0)
+        )
+        if root_type == "Row":
+            item_width = rule_number(dual_fact_rules, "itemWidth", 62.0)
+            item_gap = rule_number(dual_fact_rules, "itemGap", 8.0)
+            return (
+                len(sizes) == 2
+                and all(value == item_width for value in sizes)
+                and sizes[0] == sizes[1]
+                and gap == item_gap
+                and min_horizontal_slack <= safe_width - sum(sizes) - gap
+            )
+        if root_type != "Column":
+            return False
+        if action_ids:
+            return (
+                len(sizes) == 3
+                and sizes[0]
+                == rule_number(
+                    with_action_fallback,
+                    "header",
+                    rule_number(action_rules, "headerHeight", header_height),
+                )
+                and number_range(
+                    with_action_fallback.get("heroRange"), hero_range
+                )[0]
+                <= sizes[1]
+                <= number_range(
+                    with_action_fallback.get("heroRange"), hero_range
+                )[1]
+                and sizes[2]
+                == rule_number(
+                    with_action_fallback,
+                    "action",
+                    rule_number(action_rules, "actionHeight", action_height),
+                )
+                and sum(sizes) + gap * 2 <= safe_height
+            )
+        metric_fallback = (
+            len(sizes) in {2, 3}
+            and sizes[0] == header_height
+            and hero_range[0] <= sizes[1] <= hero_range[1]
+            and (
+                len(sizes) == 2
+                or support_range[0] <= sizes[2] <= support_range[1]
+            )
+        )
+        primary_range = number_range(date_rules.get("primaryHeightRange"), (48.0, 56.0))
+        secondary_range = number_range(date_rules.get("secondaryHeightRange"), (56.0, 72.0))
+        date_next = (
+            len(sizes) in {2, 3}
+            and any(primary_range[0] <= value <= primary_range[1] for value in sizes)
+            and any(secondary_range[0] <= value <= secondary_range[1] for value in sizes)
+            and (len(sizes) == 2 or rule_number(date_rules, "headerHeight", 20.0) in sizes)
+        )
+        dual_summary = len(sizes) == 2 and (
+            sizes
+            == [
+                rule_number(dual_summary_rules, "headerHeight", 20.0),
+                rule_number(dual_summary_rules, "contentHeight", 108.0),
+            ]
+            or sizes
+            == [
+                rule_number(dual_fact_rules, "headerHeight", 20.0),
+                rule_number(dual_fact_rules, "contentHeight", 108.0),
+            ]
+        ) and gap == rule_number(dual_fact_rules, "itemGap", 8.0)
+        return metric_fallback or date_next or dual_summary
+
+    if root_type == "Row":
+        hero_rules = wide_rules.get("wide-hero-context", {})
+        dual_rules = wide_rules.get("wide-dual-domain", {})
+        column_gap = rule_number(hero_rules, "columnGap", 8.0)
+        asymmetric = sorted(
+            float(value) for value in hero_rules.get("columnWidths", [104, 180])
+        )
+        symmetric = [
+            float(value) for value in dual_rules.get("columnWidths", [142, 142])
+        ]
+        return (
+            len(sizes) == 2
+            and gap == column_gap
+            and (
+                sorted(sizes) == asymmetric
+                or sizes == symmetric
+            )
+        )
+    if root_type != "Column":
+        return False
+    if hub:
+        return True
+    if wide_body_action:
+        return len(sizes) == 2 and sizes[1] == action_height and sum(sizes) + gap <= safe_height
+    agenda_rules = wide_rules.get("wide-agenda-stack", {})
+    agenda_header = rule_number(agenda_rules, "headerHeight", 20.0)
+    no_action_stack = (
+        len(sizes) == 2
+        and sizes[0] == agenda_header
+        and rule_number(agenda_rules, "actionListHeight", 64.0)
+        <= sizes[1]
+        <= rule_number(agenda_rules, "noActionListHeight", 108.0)
+        and sum(sizes) + gap <= safe_height
+    )
+    action_stack = (
+        len(sizes) == 3
+        and sizes[0] == agenda_header
+        and sizes[1] == rule_number(agenda_rules, "actionListHeight", 64.0)
+        and sizes[2] == rule_number(agenda_rules, "actionHeight", action_height)
+        and sum(sizes) + gap * 2 <= safe_height
+    )
+    return no_action_stack or action_stack
+
+
+def evaluate_compact_action_slot(
+    context: AestheticContext,
+    child_ids: list[str],
+    child_components: list[dict[str, Any]],
+    child_sizes: list[float | None],
+    gap: float,
+    justify: object,
+    action_ids: list[str],
+    safe_height: float,
+    action_height: float,
+    icon_button_size: float,
+) -> list[dict[str, Any]]:
+    diagnostics: list[dict[str, Any]] = []
+    action_id = action_ids[0]
+    current_id = action_id
+    while current_id in context.parent_by_child:
+        parent_id = context.parent_by_child[current_id]
+        if parent_id == context.root_id:
+            break
+        current_id = parent_id
+    slot_id = current_id
+    if not child_ids or slot_id != child_ids[-1]:
+        diagnostics.append(
+            diagnostic(
+                "warning",
+                "DESIGN_COMPACT_COMPACT_ACTION_POSITION",
+                "2x2 文字主动作必须位于最后一个底部 region。",
+                json_pointer="/updateComponents/components",
+                actual={"actionId": action_id, "slotId": slot_id},
+                expected={"lastRootChild": child_ids[-1] if child_ids else None},
+            )
+        )
+        return diagnostics
+
+    action = context.components_by_id[action_id]
+    action_styles = action.get("styles") if isinstance(action, dict) else None
+    width = numeric(action_styles.get("width")) if isinstance(action_styles, dict) else None
+    height = numeric(action_styles.get("height")) if isinstance(action_styles, dict) else None
+    is_icon_action = width == icon_button_size and height == icon_button_size
+    if not is_icon_action and (height != action_height or width is None or width < 120.0):
+        diagnostics.append(
+            diagnostic(
+                "warning",
+                "DESIGN_COMPACT_COMPACT_ACTION_GEOMETRY",
+                "2x2 文字主动作应使用接近全宽的 36vp 底部热区。",
+                json_pointer=f"/updateComponents/components/{context.source_index_by_id[action_id]}/styles",
+                actual={"width": width, "height": height},
+                expected={"minWidth": 120, "height": action_height},
+            )
+        )
+
+    occupied = sum(value or 0.0 for value in child_sizes) + gap * max(
+        len(child_sizes) - 1, 0
+    )
+    remaining = max(safe_height - occupied, 0.0)
+    bottom_margin = (
+        0.0
+        if justify == "end"
+        else remaining / 2
+        if justify == "center"
+        else remaining
+        if justify == "start"
+        else 0.0
+    )
+    if bottom_margin > 16.0:
+        diagnostics.append(
+            diagnostic(
+                "warning",
+                "DESIGN_COMPACT_COMPACT_ACTION_POSITION",
+                "2x2 底部动作距安全区底边超过 16vp。",
+                json_pointer=f"/updateComponents/components/{context.source_index_by_id[context.root_id]}/styles/justifyContent",
+                actual={"justifyContent": justify, "bottomMargin": bottom_margin},
+                expected={"maxBottomMargin": 16},
+            )
+        )
+    return diagnostics
+
+
+def evaluate_layout_contracts(
+    context: AestheticContext, *, suggest_size: object, layout_rules: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """Check fixed-size, alignment-line, gap-rhythm and slack contracts."""
+
+    diagnostics: list[dict[str, Any]] = []
+    root = context.components_by_id.get(context.root_id, {})
+    root_gap = numeric(root.get("itemMargin")) or 0.0
+    size = infer_card_size(context, suggest_size)
+    safe_areas = layout_rules.get("safeAreas", {})
+    size_safe_area = safe_areas.get(size, {}) if isinstance(safe_areas, dict) else {}
+    safe_width = rule_number(
+        size_safe_area, "width", 136.0 if size == "2x2" else 296.0
+    )
+    safe_height = rule_number(size_safe_area, "height", 136.0)
+    min_horizontal_slack = rule_number(layout_rules, "minHorizontalSlack", 4.0)
+    ratio_rules = layout_rules.get("primaryRegionRatio", {})
+    compact_ratio = number_range(
+        ratio_rules.get("2x2Height") if isinstance(ratio_rules, dict) else None,
+        (0.4, 0.55),
+    )
+    wide_ratio = number_range(
+        ratio_rules.get("2x4Width") if isinstance(ratio_rules, dict) else None,
+        (0.4, 0.62),
+    )
+    skeleton_rules = layout_rules.get("skeletons", {})
+    compact_rules = (
+        skeleton_rules.get("2x2", {}) if isinstance(skeleton_rules, dict) else {}
+    )
+    dual_summary_rules = compact_rules.get("compact-dual-item-summary", {})
+
+    for component in context.components:
+        component_id = component.get("id")
+        component_type = component.get("component")
+        styles = component.get("styles")
+        if not isinstance(component_id, str) or not isinstance(styles, dict):
+            continue
+        children = child_component_ids(component)
+        source_index = context.source_index_by_id.get(component_id)
+
+        if (
+            component_id != context.root_id
+            and component_type in {"Row", "Column", "List", "Stack"}
+            and (len(children) >= 2 or context.parent_by_child.get(component_id) == context.root_id)
+        ):
+            missing = [
+                field for field in ("width", "height") if numeric(styles.get(field)) is None
+            ]
+            if missing:
+                diagnostics.append(
+                    diagnostic(
+                        "warning",
+                        "DESIGN_COMPACT_KEY_CONTAINER_SIZE_REQUIRED",
+                        "关键内部容器必须使用数值宽高。",
+                        json_pointer=f"/updateComponents/components/{source_index}/styles",
+                        actual={"componentId": component_id, "missing": missing},
+                        expected="数值 width 与 height",
+                    )
+                )
+
+        if component_type in {"Row", "Column"}:
+            justify = styles.get("justifyContent")
+            if (
+                justify in {"spaceBetween", "spaceAround", "spaceEvenly"}
+                and component.get("itemMargin") is not None
+            ):
+                diagnostics.append(
+                    diagnostic(
+                        "warning",
+                        "DESIGN_COMPACT_DISTRIBUTED_GAP_CONFLICT",
+                        "分布式主轴对齐不得同时设置 itemMargin。",
+                        json_pointer=f"/updateComponents/components/{source_index}",
+                        actual={
+                            "justifyContent": justify,
+                            "itemMargin": component.get("itemMargin"),
+                        },
+                        expected="删除 itemMargin，先证明剩余空间非负",
+                    )
+                )
+
+        if component_id in child_component_ids(root) and children:
+            internal_gap = numeric(component.get("itemMargin")) or 0.0
+            if root_gap and internal_gap > root_gap:
+                diagnostics.append(
+                    diagnostic(
+                        "warning",
+                        "DESIGN_COMPACT_GAP_HIERARCHY_INVERTED",
+                        "一级组间距不得小于组内距。",
+                        json_pointer=f"/updateComponents/components/{source_index}/itemMargin",
+                        actual={"rootGap": root_gap, "internalGap": internal_gap},
+                        expected="root/group gap >= internal gap",
+                    )
+                )
+
+        if component_type == "Row" and len(children) >= 2:
+            child_components = [
+                context.components_by_id[child_id]
+                for child_id in children
+                if child_id in context.components_by_id
+            ]
+            contains_text_and_action = any(
+                child.get("component") == "Text" for child in child_components
+            ) and any(is_action_container(child) for child in child_components)
+            if contains_text_and_action:
+                available = numeric(styles.get("width"))
+                padding = spacing_axis_total(styles.get("padding"), "width")
+                widths = [
+                    numeric((child.get("styles") or {}).get("width"))
+                    if isinstance(child.get("styles"), dict)
+                    else None
+                    for child in child_components
+                ]
+                gap = numeric(component.get("itemMargin")) or 0.0
+                if available is not None and padding is not None and all(
+                    width is not None for width in widths
+                ):
+                    slack = available - padding - sum(widths) - gap * max(
+                        len(widths) - 1, 0
+                    )
+                    if slack < min_horizontal_slack:
+                        diagnostics.append(
+                            diagnostic(
+                                "warning",
+                                "DESIGN_COMPACT_TEXT_ACTION_SLACK_LOW",
+                                "Text + action 行必须保留至少 4vp 水平余量。",
+                                json_pointer=f"/updateComponents/components/{source_index}",
+                                actual={"componentId": component_id, "slack": slack},
+                            expected={"minHorizontalSlack": min_horizontal_slack},
+                            )
+                        )
+
+        if component_type in {"Row", "Column"} and children:
+            parent_cross_axis = "height" if component_type == "Row" else "width"
+            parent_cross = numeric(styles.get(parent_cross_axis))
+            if parent_cross is not None:
+                important_children = [
+                    context.components_by_id[child_id]
+                    for child_id in children
+                    if child_id in context.components_by_id
+                    and (
+                        context.components_by_id[child_id].get("component")
+                        in {"Image", "Progress", "Button", "Row", "Stack"}
+                        or is_action_container(context.components_by_id[child_id])
+                    )
+                ]
+                has_narrow_important = any(
+                    isinstance(child.get("styles"), dict)
+                    and (numeric(child["styles"].get(parent_cross_axis)) or parent_cross)
+                    < parent_cross
+                    for child in important_children
+                )
+                if has_narrow_important and "alignItems" not in styles:
+                    diagnostics.append(
+                        diagnostic(
+                            "warning",
+                            "DESIGN_COMPACT_CROSS_AXIS_POSITION_UNDECLARED",
+                            "窄主焦点或动作必须由父容器显式声明交叉轴位置。",
+                            json_pointer=f"/updateComponents/components/{source_index}/styles/alignItems",
+                            actual={"componentId": component_id},
+                            expected="显式 alignItems，或使用全宽定位容器",
+                        )
+                    )
+
+    root_type = root.get("component")
+    root_children = [
+        context.components_by_id[child_id]
+        for child_id in child_component_ids(root)
+        if child_id in context.components_by_id
+    ]
+    if size == "2x2" and root_type == "Column" and root_children:
+        heights = [
+            numeric((child.get("styles") or {}).get("height"))
+            if isinstance(child.get("styles"), dict)
+            else None
+            for child in root_children
+        ]
+        if len(heights) >= 2 and heights == [
+            rule_number(dual_summary_rules, "headerHeight", 20.0),
+            rule_number(dual_summary_rules, "contentHeight", 108.0),
+        ]:
+            return diagnostics  # controlled dual-list/fact summary.
+        non_action_heights = [
+            height
+            for child, height in zip(root_children, heights)
+            if height is not None
+            and not is_action_container(child)
+        ]
+        if non_action_heights:
+            ratio = max(non_action_heights) / safe_height
+            if ratio < compact_ratio[0] or ratio > compact_ratio[1]:
+                diagnostics.append(
+                    diagnostic(
+                        "warning",
+                        "DESIGN_COMPACT_PRIMARY_REGION_RATIO",
+                        "2x2 主显示组通常应占安全区高度的 40%–55%。",
+                        json_pointer=f"/updateComponents/components/{context.source_index_by_id[context.root_id]}",
+                        actual={"ratio": round(ratio, 3)},
+                        expected={"range": list(compact_ratio)},
+                    )
+                )
+    elif size == "2x4" and root_type == "Row" and root_children:
+        widths = [
+            numeric((child.get("styles") or {}).get("width"))
+            if isinstance(child.get("styles"), dict)
+            else None
+            for child in root_children
+        ]
+        if widths and all(width is not None for width in widths):
+            ratio = max(widths) / safe_width
+            if ratio < wide_ratio[0] or ratio > wide_ratio[1]:
+                diagnostics.append(
+                    diagnostic(
+                        "warning",
+                        "DESIGN_COMPACT_PRIMARY_REGION_RATIO",
+                        "2x4 主区域通常应占安全区宽度的 40%–62%。",
+                        json_pointer=f"/updateComponents/components/{context.source_index_by_id[context.root_id]}",
+                        actual={"ratio": round(ratio, 3)},
+                        expected={"range": list(wide_ratio)},
+                    )
+                )
+    return diagnostics
+
+
+def evaluate_spacing_tokens(
+    context: AestheticContext, spacing_tokens: frozenset[float]
+) -> list[dict[str, Any]]:
     violations: list[dict[str, Any]] = []
     for component in context.components:
         component_id = component.get("id")
@@ -1082,7 +2197,7 @@ def evaluate_spacing_tokens(context: AestheticContext) -> list[dict[str, Any]]:
             continue
         for field in ("itemMargin", "space"):
             value = numeric(component.get(field))
-            if value is not None and value not in SPACING_TOKENS:
+            if value is not None and value not in spacing_tokens:
                 violations.append(
                     {"componentId": component_id, "field": field, "value": value}
                 )
@@ -1091,7 +2206,7 @@ def evaluate_spacing_tokens(context: AestheticContext) -> list[dict[str, Any]]:
             continue
         for field in ("margin", "padding"):
             for path, value in iter_spacing_numbers(styles.get(field), field):
-                if value not in SPACING_TOKENS:
+                if value not in spacing_tokens:
                     violations.append(
                         {"componentId": component_id, "field": path, "value": value}
                     )
@@ -1105,8 +2220,8 @@ def evaluate_spacing_tokens(context: AestheticContext) -> list[dict[str, Any]]:
             "间距未落在卡片 spacing token 阶梯内，容易破坏节奏一致性。",
             json_pointer="/updateComponents/components",
             actual={"violations": violations},
-            expected={"allowedSpacingTokens": sorted(SPACING_TOKENS)},
-            fix_hint="只使用 Pixso 0804 出现的 0/2/4/8/12/16vp；结构间距优先 4/8vp。",
+            expected={"allowedSpacingTokens": sorted(spacing_tokens)},
+            fix_hint="只使用 2/4/6/8/10/12/14/16vp；结构间距优先 4/8/12/16vp。",
         )
     ]
 
@@ -1243,21 +2358,45 @@ def evaluate_static_text_clip_risk(context: AestheticContext) -> list[dict[str, 
         padding = spacing_axis_total(styles.get("padding"), "width")
         if (
             content is None
-            or is_dynamic_dsl_value(content)
             or width is None
             or padding is None
             or max_lines <= 0
             or any(field in styles for field in ("minFontSize", "maxFontSize"))
         ):
             continue
+        protected = is_protected_text_component(
+            component_id, component_type, styles
+        )
+        overflow_policy = styles.get("textOverflow")
+        if protected and overflow_policy in {"clip", "ellipsis"}:
+            diagnostics.append(
+                diagnostic(
+                    "warning",
+                    "DESIGN_COMPACT_PROTECTED_TEXT_OVERFLOW_POLICY",
+                    "受保护文本不得依赖 clip 或 ellipsis。",
+                    json_pointer=f"/updateComponents/components/{context.source_index_by_id[component_id]}/styles/textOverflow",
+                    actual={
+                        "componentId": component_id,
+                        "textOverflow": overflow_policy,
+                    },
+                    expected="省略 textOverflow，并通过固定槽位和 1.2× 压力测试保证完整显示。",
+                    fix_hint="扩大文本槽位、删减 shouldKeep，或改用同尺寸更简单骨架。",
+                )
+            )
+        if is_dynamic_dsl_value(content):
+            continue
         available = width - padding
-        estimated = estimate_text_width(content, font_size)
+        estimated = estimate_text_width(content, font_size) * 1.2
         capacity = max(available, 0.0) * max_lines
         if estimated <= capacity + 1e-9:
             continue
-        if component_type == "Text" and styles.get("textOverflow") == "ellipsis":
-            # Pixso 0804 explicitly truncates title/body/auxiliary text at
-            # their declared maxLines. Buttons and critical values remain protected.
+        if (
+            component_type == "Text"
+            and styles.get("textOverflow") == "ellipsis"
+            and not protected
+        ):
+            # Non-critical supporting text may truncate. Buttons and protected
+            # content remain subject to explicit review.
             continue
         diagnostics.append(
             diagnostic(
@@ -1274,7 +2413,7 @@ def evaluate_static_text_clip_risk(context: AestheticContext) -> list[dict[str, 
                     "maxLines": max_lines,
                     "fontSize": font_size,
                 },
-                expected="estimatedTextWidth <= availableWidth * maxLines",
+                expected="estimatedTextWidth * 1.2 <= availableWidth * maxLines",
                 fix_hint="缩短文案、增加可用宽度/行数，或在真实渲染中确认可接受的省略策略。",
             )
         )
@@ -1287,6 +2426,41 @@ def visible_text_value(component: dict[str, Any]) -> str | None:
     return value if isinstance(value, str) and value.strip() else None
 
 
+PROTECTED_TEXT_ID_MARKERS = (
+    "title",
+    "status",
+    "date",
+    "time",
+    "metric",
+    "value",
+    "price",
+    "amount",
+    "quantity",
+    "count",
+    "contact",
+    "phone",
+    "temperature",
+    "percent",
+    "countdown",
+    "cta",
+    "action",
+    "button",
+)
+
+
+def is_protected_text_component(
+    component_id: str, component_type: object, styles: dict[str, Any]
+) -> bool:
+    if component_type == "Button":
+        return True
+    lowered = component_id.lower()
+    if any(marker in lowered for marker in PROTECTED_TEXT_ID_MARKERS):
+        return True
+    font_size = numeric(styles.get("fontSize")) or 16.0
+    font_weight = normalize_font_weight(styles.get("fontWeight"), component_type)
+    return font_size >= 18.0 or font_weight >= 600.0
+
+
 def is_dynamic_dsl_value(value: object) -> bool:
     return isinstance(value, str) and "{{" in value and "}}" in value
 
@@ -1297,13 +2471,15 @@ def estimate_text_width(text: str, font_size: float) -> float:
     units = 0.0
     for character in text:
         if character.isspace():
-            units += 0.35
+            units += 0.4
+        elif character in "%℃°￥$€£¥":
+            units += 0.8
         elif ord(character) >= 0x2E80:
             units += 1.0
         elif character.isalnum():
-            units += 0.6
+            units += 0.65
         else:
-            units += 0.45
+            units += 0.6
     return units * font_size
 
 
@@ -2023,6 +3199,23 @@ def numeric(value: Any) -> float | None:
             number = float(match.group(1))
             return number if math.isfinite(number) else None
     return None
+
+
+def rule_number(mapping: object, key: str, default: float) -> float:
+    if not isinstance(mapping, dict):
+        return default
+    value = numeric(mapping.get(key))
+    return value if value is not None else default
+
+
+def number_range(value: object, default: tuple[float, float]) -> tuple[float, float]:
+    if not isinstance(value, (list, tuple)) or len(value) != 2:
+        return default
+    lower = numeric(value[0])
+    upper = numeric(value[1])
+    if lower is None or upper is None or lower > upper:
+        return default
+    return lower, upper
 
 
 def normalize_font_weight(value: object, component_type: object) -> float:
